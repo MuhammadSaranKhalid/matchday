@@ -1572,10 +1572,10 @@ begin
 
   -- Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
   ) values (
     '65000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
-    1, 'published', 1, '{"fixtures_count": 3}'::jsonb
+    1, 'published', 1, '{"fixtures_count": 3}'::jsonb, now(), v_owner
   ) on conflict (draw_revision_id) do nothing;
 
   -- Fixtures
@@ -1643,10 +1643,10 @@ begin
 
   -- Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
   ) values (
     '65000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002',
-    1, 'published', 1, '{"fixtures_count": 3}'::jsonb
+    1, 'published', 1, '{"fixtures_count": 3}'::jsonb, now(), v_owner
   ) on conflict (draw_revision_id) do nothing;
 
   -- Fixtures
@@ -1718,10 +1718,10 @@ begin
 
   -- Stage 1 Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
   ) values (
     '65000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003',
-    1, 'published', 1, '{"fixtures_count": 2}'::jsonb
+    1, 'published', 1, '{"fixtures_count": 2}'::jsonb, now(), v_owner
   ) on conflict (draw_revision_id) do nothing;
 
   -- Stage 1 Fixtures
@@ -1752,10 +1752,10 @@ begin
 
   -- Stage 2 Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
   ) values (
     '65000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003',
-    1, 'published', 1, '{"fixtures_count": 1}'::jsonb
+    1, 'published', 1, '{"fixtures_count": 1}'::jsonb, now(), v_owner
   ) on conflict (draw_revision_id) do nothing;
 
   -- Stage 2 Fixtures

@@ -29,81 +29,63 @@ create trigger trg_tournament_groups_set_updated_at
   before update on public.tournament_groups
   for each row execute function public.set_updated_at();
 
+-- Published draw protection: cannot delete group referenced by published or superseded draw revision
+create or replace function public.trg_groups_published_draw_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if exists (
+    select 1
+    from public.tournament_fixtures f
+    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+    where dr.status in ('published', 'superseded')
+      and exists (
+        select 1
+        from public.tournament_rounds r
+        where r.round_id = f.round_id and r.group_id = old.group_id
+      )
+  ) or exists (
+    select 1
+    from public.tournament_fixture_slots fs
+    join public.tournament_fixtures f on f.fixture_id = fs.fixture_id
+    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+    where dr.status in ('published', 'superseded')
+      and fs.source_group_id = old.group_id
+  ) then
+    raise exception 'Cannot delete group % referenced by published or superseded draw revision', old.group_id
+      using errcode = '22000';
+  end if;
+  return old;
+end;
+$$;
+
+revoke execute on function public.trg_groups_published_draw_protection() from public;
+
+drop trigger if exists trg_groups_published_draw_protection on public.tournament_groups;
+create trigger trg_groups_published_draw_protection
+  before delete on public.tournament_groups
+  for each row execute function public.trg_groups_published_draw_protection();
+
 -- RLS
+-- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.
 alter table public.tournament_groups enable row level security;
 
-create policy "tournament_groups_read"
+create policy "tournament_groups_read_staff"
   on public.tournament_groups
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_groups.tournament_id
         and (
-          t.privacy = 'public'
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
         )
     )
   );
 
-create policy "tournament_groups_insert"
-  on public.tournament_groups
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_groups.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_groups_update"
-  on public.tournament_groups
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_groups.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_groups.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_groups_delete"
-  on public.tournament_groups
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_groups.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );

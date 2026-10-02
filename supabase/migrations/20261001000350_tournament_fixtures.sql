@@ -56,87 +56,84 @@ create index idx_fixtures_venue
   on public.tournament_fixtures (venue_id)
   where venue_id is not null;
 
+create index idx_fixtures_tournament
+  on public.tournament_fixtures (tournament_id);
+
 -- 4. Triggers
 create trigger trg_tournament_fixtures_set_updated_at
   before update on public.tournament_fixtures
   for each row execute function public.set_updated_at();
 
+-- Published draw protection: once a draw revision is published or superseded,
+-- fixtures belonging to it cannot be deleted or have their structural topology mutated.
+create or replace function public.enforce_fixture_published_draw_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_status public.tournament_draw_revision_status;
+begin
+  if tg_op = 'DELETE' then
+    select status into v_status
+    from public.tournament_draw_revisions
+    where draw_revision_id = old.draw_revision_id;
+
+    if v_status in ('published', 'superseded') then
+      raise exception 'Cannot delete fixture belonging to a published or superseded draw revision'
+        using errcode = '22000';
+    end if;
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    select status into v_status
+    from public.tournament_draw_revisions
+    where draw_revision_id = old.draw_revision_id;
+
+    if v_status in ('published', 'superseded') then
+      if new.stage_id <> old.stage_id
+         or new.round_id <> old.round_id
+         or new.draw_revision_id <> old.draw_revision_id
+         or new.fixture_number <> old.fixture_number then
+        raise exception 'Cannot alter topology of a fixture belonging to a published or superseded draw revision'
+          using errcode = '22000';
+      end if;
+    end if;
+    return new;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.enforce_fixture_published_draw_protection() from public;
+
+create trigger trg_fixtures_draw_revision_published_protection
+  before update or delete on public.tournament_fixtures
+  for each row execute function public.enforce_fixture_published_draw_protection();
+
 -- 5. RLS
 alter table public.tournament_fixtures enable row level security;
 
-create policy "tournament_fixtures_read"
+-- Phase 4.1: Direct client mutation (INSERT, UPDATE, DELETE) is denied.
+-- Mutations are command-owned (Phase 5 tournament-action, Phase 9 scheduling commands).
+-- Staff/organizers may view fixtures; safe public read models will be introduced in Phase 12.
+create policy "tournament_fixtures_read_staff"
   on public.tournament_fixtures
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_fixtures.tournament_id
         and (
-          t.privacy = 'public'
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
-        )
-    )
-  );
-
-create policy "tournament_fixtures_insert"
-  on public.tournament_fixtures
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixtures.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-        )
-    )
-  );
-
-create policy "tournament_fixtures_update"
-  on public.tournament_fixtures
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixtures.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
+          or can('tournament', t.tournament_id, 'tournament.view_admin')
           or can('tournament', t.tournament_id, 'tournament.fixture.schedule')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixtures.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-          or can('tournament', t.tournament_id, 'tournament.fixture.schedule')
-        )
-    )
-  );
-
-create policy "tournament_fixtures_delete"
-  on public.tournament_fixtures
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixtures.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
           or can('tournament', t.tournament_id, 'tournament.draw.manage')
         )
     )

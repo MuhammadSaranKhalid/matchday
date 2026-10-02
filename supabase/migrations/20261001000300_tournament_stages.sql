@@ -49,81 +49,51 @@ create trigger trg_tournament_stages_set_updated_at
   before update on public.tournament_stages
   for each row execute function public.set_updated_at();
 
+-- Published draw protection: cannot delete stage containing published or superseded draw revisions
+create or replace function public.trg_stages_published_draw_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if exists (
+    select 1
+    from public.tournament_draw_revisions dr
+    where dr.stage_id = old.stage_id
+      and dr.status in ('published', 'superseded')
+  ) then
+    raise exception 'Cannot delete stage % with published or superseded draw revision', old.stage_id
+      using errcode = '22000';
+  end if;
+  return old;
+end;
+$$;
+
+revoke execute on function public.trg_stages_published_draw_protection() from public;
+
+drop trigger if exists trg_stages_published_draw_protection on public.tournament_stages;
+create trigger trg_stages_published_draw_protection
+  before delete on public.tournament_stages
+  for each row execute function public.trg_stages_published_draw_protection();
+
 -- 5. RLS
+-- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.
 alter table public.tournament_stages enable row level security;
 
-create policy "tournament_stages_read"
+create policy "tournament_stages_read_staff"
   on public.tournament_stages
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_stages.tournament_id
         and (
-          t.privacy = 'public'
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
         )
     )
   );
 
-create policy "tournament_stages_insert"
-  on public.tournament_stages
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_stages.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_stages_update"
-  on public.tournament_stages
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_stages.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_stages.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_stages_delete"
-  on public.tournament_stages
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_stages.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );

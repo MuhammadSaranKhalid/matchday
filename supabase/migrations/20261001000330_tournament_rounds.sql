@@ -33,86 +33,61 @@ create unique index idx_rounds_group_number
 create index idx_rounds_lookup
   on public.tournament_rounds (stage_id, round_number);
 
+create index idx_rounds_group_id
+  on public.tournament_rounds (group_id)
+  where group_id is not null;
+
 -- Triggers
 create trigger trg_tournament_rounds_set_updated_at
   before update on public.tournament_rounds
   for each row execute function public.set_updated_at();
 
+-- Published draw protection: cannot delete round if it contains fixtures in published or superseded draw revision
+create or replace function public.trg_rounds_published_draw_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if exists (
+    select 1
+    from public.tournament_fixtures f
+    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+    where f.round_id = old.round_id
+      and dr.status in ('published', 'superseded')
+  ) then
+    raise exception 'Cannot delete round % containing fixtures in published or superseded draw revision', old.round_id
+      using errcode = '22000';
+  end if;
+  return old;
+end;
+$$;
+
+revoke execute on function public.trg_rounds_published_draw_protection() from public;
+
+drop trigger if exists trg_rounds_published_draw_protection on public.tournament_rounds;
+create trigger trg_rounds_published_draw_protection
+  before delete on public.tournament_rounds
+  for each row execute function public.trg_rounds_published_draw_protection();
+
 -- RLS
+-- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.
 alter table public.tournament_rounds enable row level security;
 
-create policy "tournament_rounds_read"
+create policy "tournament_rounds_read_staff"
   on public.tournament_rounds
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_rounds.tournament_id
         and (
-          t.privacy = 'public'
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
         )
     )
   );
 
-create policy "tournament_rounds_insert"
-  on public.tournament_rounds
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_rounds.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_rounds_update"
-  on public.tournament_rounds
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_rounds.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_rounds.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );
-
-create policy "tournament_rounds_delete"
-  on public.tournament_rounds
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_rounds.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.structure.manage')
-        )
-    )
-  );

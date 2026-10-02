@@ -2093,21 +2093,136 @@ Fixture Slots (`tournament_fixture_slots`)
 
 ---
 
-### 25.3 Phase 4 Final Gate Verdict
+### 25.3 Phase 4 Initial Gate Statement
+
+Phase 4 initial migrations established the canonical structural foundation. Phase 4.1 closed all authority and graph integrity boundaries.
+
+---
+
+## 26. Phase 4.1 — Structural Mutation, Revision & Graph Integrity Closure
+
+### 26.1 Authority, Mutation & Immutability Architecture
+
+Phase 4.1 performs essential integrity hardening on the Phase 4 canonical tournament competition structure:
+
+```text
+Tournament
+   ↓ (entry_revision maintained by DB triggers)
+Stage (`tournament_stages`)
+   ↓ (composite FK & strict sequence hierarchy)
+Stage Entry (`tournament_stage_entries`)
+   ↓ (group_id scoped to stage)
+Group (`tournament_groups`)
+   ↓ (stage & group scoped)
+Round (`tournament_rounds`)
+   ↓ (immutable snapshot & metadata check)
+Draw Revision (`tournament_draw_revisions`)
+   ↓ (published topology freeze trigger)
+Fixture (`tournament_fixtures`)
+   ↓ (published topology freeze trigger)
+Fixture Slots (`tournament_fixture_slots`)
+```
+
+#### Key Architecture Enhancements
+1. **Command Boundary (Data API Read-Only)**:
+   - Direct client mutation (`INSERT`, `UPDATE`, `DELETE`) is completely revoked on all 7 canonical structural tables:
+     - `tournament_stages`
+     - `tournament_stage_entries`
+     - `tournament_groups`
+     - `tournament_rounds`
+     - `tournament_draw_revisions`
+     - `tournament_fixtures`
+     - `tournament_fixture_slots`
+   - Normal `anon` and `authenticated` users (including Tournament Managers and Owners) cannot bypass the future command boundary (`tournament-action` in Phase 5).
+2. **Capability Separation (`draw.manage` vs `draw.publish`)**:
+   - Distinct granular capabilities enforced. `tournament.draw.manage` allows preparing draft structures, but cannot mark revisions published or superseded.
+   - `tournament.draw.publish` is a distinct high-privilege capability required to publish authoritative draws.
+   - `chk_draw_revision_status_metadata` constraint enforces:
+     - `status = 'draft'` must have `published_at is null and published_by is null`.
+     - `status in ('published', 'superseded')` must have `published_at is not null and published_by is not null`.
+3. **Canonical Entry Set Revision**:
+   - Added `public.tournaments.entry_revision integer not null default 1 check (entry_revision > 0)`.
+   - Maintained entirely by trigger `trg_tournament_entries_entry_revision` on `public.tournament_entries` on:
+     - active Entry created (+1)
+     - active Entry withdrawn (+1)
+     - active Entry disqualified (+1)
+     - active Entry deleted (+1)
+   - Trigger `trg_tournaments_entry_revision_protect` prevents manual client tampering.
+   - Captured in `tournament_draw_revisions.based_on_entry_revision`.
+4. **Normalized Graph Immutability**:
+   - Once a `tournament_draw_revisions` row enters `published` or `superseded` state, triggers freeze the entire downstream topology:
+     - `trg_fixtures_draw_revision_published_protection` blocks deletion or mutation of `stage_id`, `round_id`, `draw_revision_id`, `fixture_number`.
+     - `trg_fixture_slots_draw_revision_published_protection` blocks deletion or mutation of slot sides, sources, and references.
+     - `trg_stages_published_draw_protection`, `trg_groups_published_draw_protection`, `trg_stage_entries_published_draw_protection`, and `trg_rounds_published_draw_protection` protect parent structural entities from cascade destruction.
+5. **StageEntry Source Stage Integrity**:
+   - Composite FK `constraint fk_stage_entries_source_stage_tournament foreign key (source_stage_id, tournament_id) references public.tournament_stages(stage_id, tournament_id)` prevents cross-tournament provenance.
+   - Trigger `enforce_stage_entry_integrity` enforces that `source_stage.sequence < target_stage.sequence` and validates active entry status on both INSERT and UPDATE reassignment.
+6. **FixtureSlot Structural Scopes**:
+   - `ENTRY` sources must belong to `tournament_stage_entries` of the target fixture's stage.
+   - `resolved_entry_id` must belong to `tournament_stage_entries` of the target fixture's stage.
+   - `ENTRY` source with `resolved_entry_id` must have `resolved_entry_id == source_entry_id`.
+   - `FIXTURE_WINNER` and `FIXTURE_LOSER` sources must reference fixtures within the EXACT SAME stage (`source_fixture.stage_id == target_fixture.stage_id`).
+   - `GROUP_RANK` and `STAGE_RANK` sources must belong to the same tournament and strictly precede the target stage sequence (`src_stage_seq < target_stage_seq`).
+7. **Privacy & Security Definer Audit**:
+   - Raw `tournament_draw_revisions` SELECT restricted to tournament staff/organizers/owners (`tournament_draw_revisions_read_staff`) to prevent public leakage of internal `plan_snapshot` and audit metadata.
+   - All Phase 4 trigger helper functions audited: `search_path = public, pg_temp;`, `REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC;`.
+
+---
+
+### 26.2 Verification & Quality Gates Matrix
+
+| Quality Gate | Command / Test | Result |
+|---|---|---|
+| **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues found)** |
+| **Architecture Invariants** | `flutter test test/architecture_test.dart` | **PASS (All 9 test groups passed)** |
+| **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
+| **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
+| **Database pgTAP Realtime Invariants** | `supabase test db supabase/tests/match_runtime_realtime_test.sql` | **PASS (14/14 passed)** |
+| **Cricket Scoring Domain Engine** | `flutter test test/features/matches/domain/scoring/` | **PASS (76/76 passed)** |
+| **Backend Integration Suite** | `pnpm test` (in `backend/`) | **PASS (28 files, 138/138 tests passed)** |
+| **Sport Command Layer Typecheck** | `npx deno check supabase/functions/cricket-match-action/index.ts` | **PASS (0 errors)** |
+| **Fresh DB Reset & Canonical Seeds** | `supabase db reset --yes` | **PASS (Clean rebuild & canonical seed)** |
+| **Phase 4.1 SQL Invariants Suite** | `scratch/test_phase4_structure.sql` | **PASS (All positive and negative cases verified)** |
+| **Full Repository Baseline** | `flutter test` (in `app/`) | **PASS (785 passed, 19 pre-existing failures, 0 new failures)** |
+| **Scope Purity (Phase 5+ absence)** | No command router, no match materialization, no progression engine | **PASS (Zero Phase 5+ concepts introduced)** |
+
+---
+
+### 26.3 Final Phase 4 / 4.1 Gate Verdict
 
 ```text
 ================================================================================
 PHASE 4 GATE: PASS
 ================================================================================
-Phase 4 (Canonical Tournament Structure Foundation) is complete and mechanically verified.
-Canonical relational structure established:
-  Tournament -> Stage -> Group -> StageEntry -> Round -> DrawRevision -> Fixture -> FixtureSlot.
-Typed slot source references, immutability triggers, cross-tournament isolation,
-development seeds, pure Dart domain entities, and data DTOs verified.
-All quality gates passed with zero regressions.
-Phase 5 has NOT begun.
+Phase 4 (Canonical Tournament Structure Foundation) and Phase 4.1 (Structural Mutation,
+Revision & Graph Integrity Closure) are complete, closed, and mechanically verified.
+
+Key Verifications:
+  1. Structural tables are Data API read-only; normal direct mutation denied.
+  2. Capabilities separated: draw.manage cannot publish DrawRevision.
+  3. draw.publish remains a distinct authority.
+  4. Draw revision publication metadata is protected against client forgery.
+  5. fixture.schedule cannot generically mutate fixture topology or state.
+  6. Progression fields are command-owned and protected from raw client writes.
+  7. Published normalized graph topology is strictly immutable.
+  8. tournaments.entry_revision provides canonical monotonic competitive entry tracking.
+  9. Entry revision advances on active entry addition, withdrawal, disqualification, deletion.
+ 10. StageEntry source_stage_id enforces composite tournament-scoped precedence.
+ 11. FixtureSlot ENTRY and resolved entries are verified within the target stage.
+ 12. FIXTURE_WINNER and FIXTURE_LOSER edges are enforced within the same stage.
+ 13. GROUP_RANK and STAGE_RANK edges are enforced strictly from preceding stages.
+ 14. Third-place and Group->Knockout topologies verified.
+ 15. BYE remains distinct from Walkover (no fake teams or match records).
+ 16. Internal draw revision plan snapshots and audit fields are restricted from public access.
+ 17. Security definer functions audited with safe search_path and public execute revoked.
+ 18. Full repository test completed with 785 passed, 0 new failures.
+ 19. Cricket command layer typechecks cleanly with Deno.
+ 20. Clean database reset succeeds with all constraints and canonical seeds.
+ 21. No Match materialization, progression, or standings engine was pulled forward.
+ 22. Phase 5 has NOT begun.
 ================================================================================
 ```
+
 
 
 

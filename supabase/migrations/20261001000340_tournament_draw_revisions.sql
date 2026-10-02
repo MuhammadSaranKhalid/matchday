@@ -31,7 +31,12 @@ create table public.tournament_draw_revisions (
     references public.tournament_stages(stage_id, tournament_id) on delete cascade,
   constraint uq_draw_revisions_stage_revision unique (stage_id, revision_number),
   constraint uq_draw_revisions_id_stage unique (draw_revision_id, stage_id),
-  constraint uq_draw_revisions_id_tournament unique (draw_revision_id, tournament_id)
+  constraint uq_draw_revisions_id_tournament unique (draw_revision_id, tournament_id),
+  constraint chk_draw_revision_status_metadata check (
+    (status = 'draft' and published_at is null and published_by is null)
+    or
+    (status in ('published', 'superseded') and published_at is not null and published_by is not null)
+  )
 );
 
 comment on table public.tournament_draw_revisions is
@@ -40,6 +45,9 @@ comment on table public.tournament_draw_revisions is
 -- 3. Indexes
 create index idx_draw_revisions_lookup
   on public.tournament_draw_revisions (stage_id, revision_number);
+
+create index idx_draw_revisions_tournament
+  on public.tournament_draw_revisions (tournament_id);
 
 -- 4. Immutability Trigger
 create or replace function public.enforce_draw_revision_immutability()
@@ -81,6 +89,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.enforce_draw_revision_immutability() from public;
+
 create trigger trg_draw_revision_immutability
   before update or delete on public.tournament_draw_revisions
   for each row execute function public.enforce_draw_revision_immutability();
@@ -88,79 +98,22 @@ create trigger trg_draw_revision_immutability
 -- 5. RLS
 alter table public.tournament_draw_revisions enable row level security;
 
-create policy "tournament_draw_revisions_read"
+-- Phase 4.1: Raw draw revision aggregate is restricted to tournament staff/owner to protect internal plan_snapshot, audit fields and drafting.
+-- Phase 12 will introduce safe public read models.
+-- Normal direct client INSERT, UPDATE, DELETE are denied; mutations are command-owned.
+create policy "tournament_draw_revisions_read_staff"
   on public.tournament_draw_revisions
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_draw_revisions.tournament_id
         and (
-          (t.privacy = 'public' and tournament_draw_revisions.status = 'published')
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
-        )
-    )
-  );
-
-create policy "tournament_draw_revisions_insert"
-  on public.tournament_draw_revisions
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_draw_revisions.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-        )
-    )
-  );
-
-create policy "tournament_draw_revisions_update"
-  on public.tournament_draw_revisions
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_draw_revisions.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-          or can('tournament', t.tournament_id, 'tournament.draw.publish')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_draw_revisions.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-          or can('tournament', t.tournament_id, 'tournament.draw.publish')
-        )
-    )
-  );
-
-create policy "tournament_draw_revisions_delete"
-  on public.tournament_draw_revisions
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_draw_revisions.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
+          or can('tournament', t.tournament_id, 'tournament.view_admin')
           or can('tournament', t.tournament_id, 'tournament.draw.manage')
         )
     )

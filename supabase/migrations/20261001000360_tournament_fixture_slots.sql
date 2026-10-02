@@ -74,11 +74,23 @@ create index idx_fixture_slots_source_fixture
   on public.tournament_fixture_slots (source_fixture_id)
   where source_fixture_id is not null;
 
+create index idx_fixture_slots_source_entry
+  on public.tournament_fixture_slots (source_entry_id)
+  where source_entry_id is not null;
+
+create index idx_fixture_slots_source_group
+  on public.tournament_fixture_slots (source_group_id)
+  where source_group_id is not null;
+
+create index idx_fixture_slots_source_stage
+  on public.tournament_fixture_slots (source_stage_id)
+  where source_stage_id is not null;
+
 create index idx_fixture_slots_resolved_entry
   on public.tournament_fixture_slots (resolved_entry_id)
   where resolved_entry_id is not null;
 
--- 4. Cross-Tournament Referential Integrity Trigger
+-- 4. Cross-Tournament & Structural Scope Referential Integrity Trigger
 create or replace function public.enforce_fixture_slot_integrity()
 returns trigger
 language plpgsql
@@ -87,49 +99,108 @@ set search_path = public, pg_temp
 as $$
 declare
   v_target_tournament_id uuid;
+  v_target_stage_seq     integer;
+  v_src_stage_id         uuid;
+  v_src_stage_seq        integer;
 begin
+  -- 1. Source Entry Scope
   if new.source_entry_id is not null then
     select tournament_id into v_target_tournament_id
     from public.tournament_entries
     where entry_id = new.source_entry_id;
+
     if v_target_tournament_id is distinct from new.tournament_id then
       raise exception 'Cross-tournament source entry reference is prohibited' using errcode = '22000';
     end if;
-  end if;
 
-  if new.source_fixture_id is not null then
-    select tournament_id into v_target_tournament_id
-    from public.tournament_fixtures
-    where fixture_id = new.source_fixture_id;
-    if v_target_tournament_id is distinct from new.tournament_id then
-      raise exception 'Cross-tournament source fixture reference is prohibited' using errcode = '22000';
+    if new.source_type = 'entry' then
+      if not exists (
+        select 1
+        from public.tournament_stage_entries
+        where stage_id = new.stage_id and entry_id = new.source_entry_id
+      ) then
+        raise exception 'Source entry must belong to target stage' using errcode = '22000';
+      end if;
+
+      if new.resolved_entry_id is not null and new.resolved_entry_id <> new.source_entry_id then
+        raise exception 'Resolved entry must match source entry for entry source type' using errcode = '22000';
+      end if;
     end if;
   end if;
 
-  if new.source_group_id is not null then
-    select tournament_id into v_target_tournament_id
-    from public.tournament_groups
-    where group_id = new.source_group_id;
-    if v_target_tournament_id is distinct from new.tournament_id then
-      raise exception 'Cross-tournament source group reference is prohibited' using errcode = '22000';
-    end if;
-  end if;
-
-  if new.source_stage_id is not null then
-    select tournament_id into v_target_tournament_id
-    from public.tournament_stages
-    where stage_id = new.source_stage_id;
-    if v_target_tournament_id is distinct from new.tournament_id then
-      raise exception 'Cross-tournament source stage reference is prohibited' using errcode = '22000';
-    end if;
-  end if;
-
+  -- 2. Resolved Entry Scope
   if new.resolved_entry_id is not null then
     select tournament_id into v_target_tournament_id
     from public.tournament_entries
     where entry_id = new.resolved_entry_id;
+
     if v_target_tournament_id is distinct from new.tournament_id then
       raise exception 'Cross-tournament resolved entry reference is prohibited' using errcode = '22000';
+    end if;
+
+    if not exists (
+      select 1
+      from public.tournament_stage_entries
+      where stage_id = new.stage_id and entry_id = new.resolved_entry_id
+    ) then
+      raise exception 'Resolved entry must belong to target stage' using errcode = '22000';
+    end if;
+  end if;
+
+  -- 3. Source Fixture Scope (Must be same stage and same tournament)
+  if new.source_fixture_id is not null then
+    select tournament_id, stage_id
+    into v_target_tournament_id, v_src_stage_id
+    from public.tournament_fixtures
+    where fixture_id = new.source_fixture_id;
+
+    if v_target_tournament_id is distinct from new.tournament_id then
+      raise exception 'Cross-tournament source fixture reference is prohibited' using errcode = '22000';
+    end if;
+
+    if v_src_stage_id is distinct from new.stage_id then
+      raise exception 'Source fixture must belong to the same stage as the target fixture' using errcode = '22000';
+    end if;
+  end if;
+
+  -- 4. Source Group Scope (Must precede target stage sequence)
+  if new.source_group_id is not null then
+    select g.tournament_id, s.sequence
+    into v_target_tournament_id, v_src_stage_seq
+    from public.tournament_groups g
+    join public.tournament_stages s on s.stage_id = g.stage_id
+    where g.group_id = new.source_group_id;
+
+    if v_target_tournament_id is distinct from new.tournament_id then
+      raise exception 'Cross-tournament source group reference is prohibited' using errcode = '22000';
+    end if;
+
+    select sequence into v_target_stage_seq
+    from public.tournament_stages
+    where stage_id = new.stage_id;
+
+    if v_src_stage_seq >= v_target_stage_seq then
+      raise exception 'Source group must belong to a stage preceding the target stage' using errcode = '22000';
+    end if;
+  end if;
+
+  -- 5. Source Stage Scope (Must precede target stage sequence)
+  if new.source_stage_id is not null then
+    select tournament_id, sequence
+    into v_target_tournament_id, v_src_stage_seq
+    from public.tournament_stages
+    where stage_id = new.source_stage_id;
+
+    if v_target_tournament_id is distinct from new.tournament_id then
+      raise exception 'Cross-tournament source stage reference is prohibited' using errcode = '22000';
+    end if;
+
+    select sequence into v_target_stage_seq
+    from public.tournament_stages
+    where stage_id = new.stage_id;
+
+    if v_src_stage_seq >= v_target_stage_seq then
+      raise exception 'Source stage must precede the target stage' using errcode = '22000';
     end if;
   end if;
 
@@ -137,9 +208,70 @@ begin
 end;
 $$;
 
+revoke execute on function public.enforce_fixture_slot_integrity() from public;
+
 create trigger trg_fixture_slot_integrity
   before insert or update on public.tournament_fixture_slots
   for each row execute function public.enforce_fixture_slot_integrity();
+
+-- Published draw protection: once a draw revision is published or superseded,
+-- fixture slots belonging to it cannot be deleted or have their structural topology mutated.
+create or replace function public.enforce_fixture_slot_published_draw_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_status public.tournament_draw_revision_status;
+begin
+  if tg_op = 'DELETE' then
+    select r.status into v_status
+    from public.tournament_fixtures f
+    join public.tournament_draw_revisions r on r.draw_revision_id = f.draw_revision_id
+    where f.fixture_id = old.fixture_id;
+
+    if v_status in ('published', 'superseded') then
+      raise exception 'Cannot delete fixture slot belonging to a published or superseded draw revision'
+        using errcode = '22000';
+    end if;
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    select r.status into v_status
+    from public.tournament_fixtures f
+    join public.tournament_draw_revisions r on r.draw_revision_id = f.draw_revision_id
+    where f.fixture_id = old.fixture_id;
+
+    if v_status in ('published', 'superseded') then
+      if new.fixture_id <> old.fixture_id
+         or new.stage_id <> old.stage_id
+         or new.tournament_id <> old.tournament_id
+         or new.side <> old.side
+         or new.source_type <> old.source_type
+         or new.source_entry_id is distinct from old.source_entry_id
+         or new.source_fixture_id is distinct from old.source_fixture_id
+         or new.source_group_id is distinct from old.source_group_id
+         or new.source_stage_id is distinct from old.source_stage_id
+         or new.source_seed is distinct from old.source_seed
+         or new.source_rank is distinct from old.source_rank then
+        raise exception 'Cannot alter topology of a fixture slot belonging to a published or superseded draw revision'
+          using errcode = '22000';
+      end if;
+    end if;
+    return new;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.enforce_fixture_slot_published_draw_protection() from public;
+
+create trigger trg_fixture_slots_draw_revision_published_protection
+  before update or delete on public.tournament_fixture_slots
+  for each row execute function public.enforce_fixture_slot_published_draw_protection();
 
 create trigger trg_tournament_fixture_slots_set_updated_at
   before update on public.tournament_fixture_slots
@@ -148,77 +280,23 @@ create trigger trg_tournament_fixture_slots_set_updated_at
 -- 5. RLS
 alter table public.tournament_fixture_slots enable row level security;
 
-create policy "tournament_fixture_slots_read"
+-- Phase 4.1: Direct client mutation (INSERT, UPDATE, DELETE) is denied.
+-- Mutations are command-owned (Phase 5 tournament-action, Phase 8/10 progression engines).
+-- Staff/organizers may view fixture slots; safe public read models will be introduced in Phase 12.
+create policy "tournament_fixture_slots_read_staff"
   on public.tournament_fixture_slots
   for select
-  to anon, authenticated
+  to authenticated
   using (
     exists (
       select 1
       from public.tournaments t
       where t.tournament_id = tournament_fixture_slots.tournament_id
         and (
-          t.privacy = 'public'
-          or t.owner_user_id = (select auth.uid())
+          t.owner_user_id = (select auth.uid())
           or is_tournament_organizer(t.tournament_id)
-        )
-    )
-  );
-
-create policy "tournament_fixture_slots_insert"
-  on public.tournament_fixture_slots
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixture_slots.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-        )
-    )
-  );
-
-create policy "tournament_fixture_slots_update"
-  on public.tournament_fixture_slots
-  for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixture_slots.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixture_slots.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
-          or can('tournament', t.tournament_id, 'tournament.draw.manage')
-        )
-    )
-  );
-
-create policy "tournament_fixture_slots_delete"
-  on public.tournament_fixture_slots
-  for delete
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.tournaments t
-      where t.tournament_id = tournament_fixture_slots.tournament_id
-        and (
-          t.owner_user_id = (select auth.uid())
+          or can('tournament', t.tournament_id, 'tournament.view_admin')
+          or can('tournament', t.tournament_id, 'tournament.fixture.schedule')
           or can('tournament', t.tournament_id, 'tournament.draw.manage')
         )
     )

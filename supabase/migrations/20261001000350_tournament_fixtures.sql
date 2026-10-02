@@ -64,8 +64,11 @@ create trigger trg_tournament_fixtures_set_updated_at
   before update on public.tournament_fixtures
   for each row execute function public.set_updated_at();
 
--- Published draw protection: once a draw revision is published or superseded,
--- fixtures belonging to it cannot be deleted or have their structural topology mutated.
+-- Published draw protection:
+-- 1. Cannot attach new fixture to an already published/superseded draw revision.
+-- 2. Cannot re-parent or alter topology (stage_id, round_id, draw_revision_id, fixture_number) of fixtures.
+-- 3. Cannot delete fixtures belonging to a published or superseded draw revision.
+-- 4. Operational fields (scheduled_start_time, venue_id, state) remain available for operational commands.
 create or replace function public.enforce_fixture_published_draw_protection()
 returns trigger
 language plpgsql
@@ -73,8 +76,21 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_status public.tournament_draw_revision_status;
+  v_status     public.tournament_draw_revision_status;
+  v_new_status public.tournament_draw_revision_status;
 begin
+  if tg_op = 'INSERT' then
+    select status into v_status
+    from public.tournament_draw_revisions
+    where draw_revision_id = new.draw_revision_id;
+
+    if v_status in ('published', 'superseded') then
+      raise exception 'Cannot attach new fixture to a published or superseded draw revision'
+        using errcode = '22000';
+    end if;
+    return new;
+  end if;
+
   if tg_op = 'DELETE' then
     select status into v_status
     from public.tournament_draw_revisions
@@ -88,30 +104,44 @@ begin
   end if;
 
   if tg_op = 'UPDATE' then
-    select status into v_status
-    from public.tournament_draw_revisions
-    where draw_revision_id = old.draw_revision_id;
+    if new.tournament_id <> old.tournament_id
+       or new.stage_id <> old.stage_id
+       or new.round_id <> old.round_id
+       or new.draw_revision_id <> old.draw_revision_id
+       or new.fixture_number <> old.fixture_number then
+      select status into v_status
+      from public.tournament_draw_revisions
+      where draw_revision_id = old.draw_revision_id;
 
-    if v_status in ('published', 'superseded') then
-      if new.stage_id <> old.stage_id
-         or new.round_id <> old.round_id
-         or new.draw_revision_id <> old.draw_revision_id
-         or new.fixture_number <> old.fixture_number then
+      if v_status in ('published', 'superseded') then
         raise exception 'Cannot alter topology of a fixture belonging to a published or superseded draw revision'
           using errcode = '22000';
       end if;
+
+      if new.draw_revision_id <> old.draw_revision_id then
+        select status into v_new_status
+        from public.tournament_draw_revisions
+        where draw_revision_id = new.draw_revision_id;
+
+        if v_new_status in ('published', 'superseded') then
+          raise exception 'Cannot re-parent fixture to a published or superseded draw revision'
+            using errcode = '22000';
+        end if;
+      end if;
     end if;
+
     return new;
   end if;
 
-  return new;
+  return null;
 end;
 $$;
 
 revoke execute on function public.enforce_fixture_published_draw_protection() from public;
 
+drop trigger if exists trg_fixtures_draw_revision_published_protection on public.tournament_fixtures;
 create trigger trg_fixtures_draw_revision_published_protection
-  before update or delete on public.tournament_fixtures
+  before insert or update or delete on public.tournament_fixtures
   for each row execute function public.enforce_fixture_published_draw_protection();
 
 -- 5. RLS

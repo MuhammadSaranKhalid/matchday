@@ -49,33 +49,145 @@ create trigger trg_tournament_stages_set_updated_at
   before update on public.tournament_stages
   for each row execute function public.set_updated_at();
 
--- Published draw protection: cannot delete stage containing published or superseded draw revisions
-create or replace function public.trg_stages_published_draw_protection()
+-- Published draw & reverse reference protection:
+-- 1. Cannot delete stage containing published/superseded draw revisions.
+-- 2. Cannot alter structural fields (sequence, format, config, rules) if stage has published draws.
+-- 3. Changing sequence must not violate upstream or downstream cross-stage qualification relationships.
+create or replace function public.enforce_stage_integrity()
 returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_is_published boolean;
 begin
-  if exists (
-    select 1
-    from public.tournament_draw_revisions dr
-    where dr.stage_id = old.stage_id
-      and dr.status in ('published', 'superseded')
-  ) then
-    raise exception 'Cannot delete stage % with published or superseded draw revision', old.stage_id
-      using errcode = '22000';
+  if tg_op = 'DELETE' then
+    if exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) then
+      raise exception 'Cannot delete stage % with published or superseded draw revision', old.stage_id
+        using errcode = '22000';
+    end if;
+    return old;
   end if;
-  return old;
+
+  if tg_op = 'UPDATE' then
+    if new.tournament_id <> old.tournament_id then
+      raise exception 'tournament_id on tournament_stages is immutable'
+        using errcode = '22000';
+    end if;
+
+    select exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) into v_is_published;
+
+    if v_is_published then
+      if new.sequence <> old.sequence
+         or new.competition_format <> old.competition_format
+         or new.competition_config is distinct from old.competition_config
+         or new.sport_rules_override is distinct from old.sport_rules_override then
+        raise exception 'Structural fields (sequence, competition_format, competition_config, sport_rules_override) of a published stage cannot be altered'
+          using errcode = '22000';
+      end if;
+    end if;
+
+    if new.sequence <> old.sequence then
+      -- 1. Check incoming stage entries from this stage (outgoing provenance)
+      if exists (
+        select 1
+        from public.tournament_stage_entries se
+        join public.tournament_stages src on src.stage_id = se.source_stage_id
+        where se.stage_id = old.stage_id
+          and src.sequence >= new.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for existing incoming stage entry qualification sources', new.sequence
+          using errcode = '22000';
+      end if;
+
+      -- 2. Check downstream stage entries sourcing this stage (incoming provenance)
+      if exists (
+        select 1
+        from public.tournament_stage_entries se
+        join public.tournament_stages tgt on tgt.stage_id = se.stage_id
+        where se.source_stage_id = old.stage_id
+          and new.sequence >= tgt.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for downstream stage entries sourcing this stage', new.sequence
+          using errcode = '22000';
+      end if;
+
+      -- 3. Check outgoing GROUP_RANK slots in this stage
+      if exists (
+        select 1
+        from public.tournament_fixture_slots fs
+        join public.tournament_groups g on g.group_id = fs.source_group_id
+        join public.tournament_stages src on src.stage_id = g.stage_id
+        where fs.stage_id = old.stage_id
+          and src.sequence >= new.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for fixture slots in this stage sourcing upstream groups', new.sequence
+          using errcode = '22000';
+      end if;
+
+      -- 4. Check downstream GROUP_RANK slots sourcing groups in this stage
+      if exists (
+        select 1
+        from public.tournament_fixture_slots fs
+        join public.tournament_groups g on g.group_id = fs.source_group_id
+        join public.tournament_stages tgt on tgt.stage_id = fs.stage_id
+        where g.stage_id = old.stage_id
+          and new.sequence >= tgt.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for downstream fixture slots sourcing groups in this stage', new.sequence
+          using errcode = '22000';
+      end if;
+
+      -- 5. Check outgoing STAGE_RANK slots in this stage
+      if exists (
+        select 1
+        from public.tournament_fixture_slots fs
+        join public.tournament_stages src on src.stage_id = fs.source_stage_id
+        where fs.stage_id = old.stage_id
+          and src.sequence >= new.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for fixture slots in this stage sourcing upstream stages', new.sequence
+          using errcode = '22000';
+      end if;
+
+      -- 6. Check downstream STAGE_RANK slots sourcing this stage
+      if exists (
+        select 1
+        from public.tournament_fixture_slots fs
+        join public.tournament_stages tgt on tgt.stage_id = fs.stage_id
+        where fs.source_stage_id = old.stage_id
+          and new.sequence >= tgt.sequence
+      ) then
+        raise exception 'Stage sequence % violates precedence for downstream fixture slots sourcing this stage', new.sequence
+          using errcode = '22000';
+      end if;
+    end if;
+
+    return new;
+  end if;
+
+  return null;
 end;
 $$;
 
-revoke execute on function public.trg_stages_published_draw_protection() from public;
+revoke execute on function public.enforce_stage_integrity() from public;
 
 drop trigger if exists trg_stages_published_draw_protection on public.tournament_stages;
-create trigger trg_stages_published_draw_protection
-  before delete on public.tournament_stages
-  for each row execute function public.trg_stages_published_draw_protection();
+drop trigger if exists trg_stage_integrity on public.tournament_stages;
+create trigger trg_stage_integrity
+  before update or delete on public.tournament_stages
+  for each row execute function public.enforce_stage_integrity();
 
 -- 5. RLS
 -- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.

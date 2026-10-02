@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, private, extensions;
 
-select plan(45);
+select plan(49);
 
 select enum_has_labels(
   'public',

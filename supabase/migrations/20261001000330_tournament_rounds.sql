@@ -13,7 +13,7 @@ create table public.tournament_rounds (
   constraint fk_tournament_rounds_stage_tournament foreign key (stage_id, tournament_id)
     references public.tournament_stages(stage_id, tournament_id) on delete cascade,
   constraint fk_tournament_rounds_group_stage foreign key (group_id, stage_id)
-    references public.tournament_groups(group_id, stage_id) on delete set null,
+    references public.tournament_groups(group_id, stage_id) on delete set null (group_id),
   constraint uq_tournament_rounds_id_stage unique (round_id, stage_id),
   constraint uq_tournament_rounds_id_tournament unique (round_id, tournament_id)
 );
@@ -42,34 +42,76 @@ create trigger trg_tournament_rounds_set_updated_at
   before update on public.tournament_rounds
   for each row execute function public.set_updated_at();
 
--- Published draw protection: cannot delete round if it contains fixtures in published or superseded draw revision
-create or replace function public.trg_rounds_published_draw_protection()
+-- Published draw & structural integrity protection for tournament_rounds
+create or replace function public.enforce_round_integrity()
 returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_is_published boolean;
 begin
-  if exists (
-    select 1
-    from public.tournament_fixtures f
-    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
-    where f.round_id = old.round_id
-      and dr.status in ('published', 'superseded')
-  ) then
-    raise exception 'Cannot delete round % containing fixtures in published or superseded draw revision', old.round_id
-      using errcode = '22000';
+  if tg_op = 'DELETE' then
+    if exists (
+      select 1
+      from public.tournament_fixtures f
+      join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+      where f.round_id = old.round_id
+        and dr.status in ('published', 'superseded')
+    ) or exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) then
+      raise exception 'Cannot delete round % containing fixtures in published or superseded draw revision', old.round_id
+        using errcode = '22000';
+    end if;
+    return old;
   end if;
-  return old;
+
+  if tg_op = 'UPDATE' then
+    if new.stage_id <> old.stage_id or new.tournament_id <> old.tournament_id then
+      raise exception 'stage_id and tournament_id on tournament_rounds are immutable'
+        using errcode = '22000';
+    end if;
+
+    select exists (
+      select 1
+      from public.tournament_fixtures f
+      join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+      where f.round_id = old.round_id
+        and dr.status in ('published', 'superseded')
+    ) or exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) into v_is_published;
+
+    if v_is_published then
+      if new.round_number <> old.round_number
+         or new.group_id is distinct from old.group_id then
+        raise exception 'Structural fields (round_number, group_id) of a round in a published stage cannot be altered'
+          using errcode = '22000';
+      end if;
+    end if;
+
+    return new;
+  end if;
+
+  return null;
 end;
 $$;
 
-revoke execute on function public.trg_rounds_published_draw_protection() from public;
+revoke execute on function public.enforce_round_integrity() from public;
 
 drop trigger if exists trg_rounds_published_draw_protection on public.tournament_rounds;
-create trigger trg_rounds_published_draw_protection
-  before delete on public.tournament_rounds
-  for each row execute function public.trg_rounds_published_draw_protection();
+drop trigger if exists trg_rounds_integrity on public.tournament_rounds;
+create trigger trg_rounds_integrity
+  before update or delete on public.tournament_rounds
+  for each row execute function public.enforce_round_integrity();
 
 -- RLS
 -- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.

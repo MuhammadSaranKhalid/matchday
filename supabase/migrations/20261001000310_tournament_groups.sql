@@ -29,45 +29,80 @@ create trigger trg_tournament_groups_set_updated_at
   before update on public.tournament_groups
   for each row execute function public.set_updated_at();
 
--- Published draw protection: cannot delete group referenced by published or superseded draw revision
-create or replace function public.trg_groups_published_draw_protection()
+-- Published draw & structural integrity protection for tournament_groups
+create or replace function public.enforce_group_integrity()
 returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_is_published boolean;
 begin
-  if exists (
-    select 1
-    from public.tournament_fixtures f
-    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
-    where dr.status in ('published', 'superseded')
-      and exists (
-        select 1
-        from public.tournament_rounds r
-        where r.round_id = f.round_id and r.group_id = old.group_id
-      )
-  ) or exists (
-    select 1
-    from public.tournament_fixture_slots fs
-    join public.tournament_fixtures f on f.fixture_id = fs.fixture_id
-    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
-    where dr.status in ('published', 'superseded')
-      and fs.source_group_id = old.group_id
-  ) then
-    raise exception 'Cannot delete group % referenced by published or superseded draw revision', old.group_id
-      using errcode = '22000';
+  if tg_op = 'DELETE' then
+    if exists (
+      select 1
+      from public.tournament_fixtures f
+      join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+      where dr.status in ('published', 'superseded')
+        and exists (
+          select 1
+          from public.tournament_rounds r
+          where r.round_id = f.round_id and r.group_id = old.group_id
+        )
+    ) or exists (
+      select 1
+      from public.tournament_fixture_slots fs
+      join public.tournament_fixtures f on f.fixture_id = fs.fixture_id
+      join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
+      where dr.status in ('published', 'superseded')
+        and fs.source_group_id = old.group_id
+    ) or exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) then
+      raise exception 'Cannot delete group % referenced by published or superseded draw revision', old.group_id
+        using errcode = '22000';
+    end if;
+    return old;
   end if;
-  return old;
+
+  if tg_op = 'UPDATE' then
+    if new.stage_id <> old.stage_id or new.tournament_id <> old.tournament_id then
+      raise exception 'stage_id and tournament_id on tournament_groups are immutable'
+        using errcode = '22000';
+    end if;
+
+    select exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) into v_is_published;
+
+    if v_is_published then
+      if new.sequence <> old.sequence then
+        raise exception 'Cannot alter sequence of a group in a published stage'
+          using errcode = '22000';
+      end if;
+    end if;
+
+    return new;
+  end if;
+
+  return null;
 end;
 $$;
 
-revoke execute on function public.trg_groups_published_draw_protection() from public;
+revoke execute on function public.enforce_group_integrity() from public;
 
 drop trigger if exists trg_groups_published_draw_protection on public.tournament_groups;
-create trigger trg_groups_published_draw_protection
-  before delete on public.tournament_groups
-  for each row execute function public.trg_groups_published_draw_protection();
+drop trigger if exists trg_groups_integrity on public.tournament_groups;
+create trigger trg_groups_integrity
+  before update or delete on public.tournament_groups
+  for each row execute function public.enforce_group_integrity();
 
 -- RLS
 -- Structural tables are command-owned. Direct client INSERT, UPDATE, DELETE through PostgREST are denied.

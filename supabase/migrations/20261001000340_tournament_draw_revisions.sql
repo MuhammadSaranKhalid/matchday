@@ -49,7 +49,49 @@ create index idx_draw_revisions_lookup
 create index idx_draw_revisions_tournament
   on public.tournament_draw_revisions (tournament_id);
 
--- 4. Immutability Trigger
+-- 4. Insert & Immutability Triggers
+create or replace function public.enforce_draw_revision_insert_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_stage_tournament_id uuid;
+  v_entry_revision      integer;
+begin
+  -- Validate stage belongs to the specified tournament
+  select tournament_id into v_stage_tournament_id
+  from public.tournament_stages
+  where stage_id = new.stage_id;
+
+  if v_stage_tournament_id is null or v_stage_tournament_id <> new.tournament_id then
+    raise exception 'Stage % does not belong to tournament %', new.stage_id, new.tournament_id
+      using errcode = '22000';
+  end if;
+
+  -- Canonical entry revision is stamped by the database; caller cannot forge it
+  select entry_revision into v_entry_revision
+  from public.tournaments
+  where tournament_id = new.tournament_id;
+
+  if v_entry_revision is null then
+    raise exception 'Tournament % does not exist', new.tournament_id
+      using errcode = '22000';
+  end if;
+
+  new.based_on_entry_revision := v_entry_revision;
+  return new;
+end;
+$$;
+
+revoke execute on function public.enforce_draw_revision_insert_integrity() from public;
+
+drop trigger if exists trg_draw_revision_insert_integrity on public.tournament_draw_revisions;
+create trigger trg_draw_revision_insert_integrity
+  before insert on public.tournament_draw_revisions
+  for each row execute function public.enforce_draw_revision_insert_integrity();
+
 create or replace function public.enforce_draw_revision_immutability()
 returns trigger
 language plpgsql
@@ -74,7 +116,10 @@ begin
            or new.based_on_entry_revision <> old.based_on_entry_revision
            or new.plan_snapshot <> old.plan_snapshot
            or new.published_at <> old.published_at
-           or new.published_by is distinct from old.published_by then
+           or new.published_by is distinct from old.published_by
+           or new.created_at <> old.created_at
+           or new.created_by is distinct from old.created_by
+           or new.revision_reason is distinct from old.revision_reason then
           raise exception 'Immutable fields of published draw revision cannot be updated'
             using errcode = '22000';
         end if;
@@ -91,6 +136,7 @@ $$;
 
 revoke execute on function public.enforce_draw_revision_immutability() from public;
 
+drop trigger if exists trg_draw_revision_immutability on public.tournament_draw_revisions;
 create trigger trg_draw_revision_immutability
   before update or delete on public.tournament_draw_revisions
   for each row execute function public.enforce_draw_revision_immutability();

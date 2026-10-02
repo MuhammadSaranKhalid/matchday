@@ -4,8 +4,7 @@ import 'package:equatable/equatable.dart';
 enum TournamentDrawRevisionStatus {
   draft('draft', 'Draft'),
   published('published', 'Published'),
-  superseded('superseded', 'Superseded'),
-  discarded('discarded', 'Discarded');
+  superseded('superseded', 'Superseded');
 
   const TournamentDrawRevisionStatus(this.wire, this.label);
   final String wire;

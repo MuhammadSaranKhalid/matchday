@@ -1572,10 +1572,10 @@ begin
 
   -- Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
   ) values (
     '65000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
-    1, 'published', 1, '{"fixtures_count": 3}'::jsonb, now(), v_owner
+    1, 'draft', 1, '{"fixtures_count": 3}'::jsonb
   ) on conflict (draw_revision_id) do nothing;
 
   -- Fixtures
@@ -1600,6 +1600,10 @@ begin
     ('70000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'A', 'fixture_winner', '70000000-0000-0000-0000-000000000001'),
     ('70000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'B', 'fixture_winner', '70000000-0000-0000-0000-000000000002')
   on conflict (fixture_id, side) do nothing;
+
+  update public.tournament_draw_revisions
+  set status = 'published', published_at = now(), published_by = v_owner
+  where draw_revision_id = '65000000-0000-0000-0000-000000000001';
 
   -- 2. Round Robin Tournament (3 teams: 3 fixtures)
   insert into public.tournaments (
@@ -1643,10 +1647,10 @@ begin
 
   -- Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
   ) values (
     '65000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002',
-    1, 'published', 1, '{"fixtures_count": 3}'::jsonb, now(), v_owner
+    1, 'draft', 1, '{"fixtures_count": 3}'::jsonb
   ) on conflict (draw_revision_id) do nothing;
 
   -- Fixtures
@@ -1667,6 +1671,10 @@ begin
     ('70000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'A', 'entry', 'e0000000-0000-0000-0000-000000000007'),
     ('70000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'B', 'entry', 'e0000000-0000-0000-0000-000000000005')
   on conflict (fixture_id, side) do nothing;
+
+  update public.tournament_draw_revisions
+  set status = 'published', published_at = now(), published_by = v_owner
+  where draw_revision_id = '65000000-0000-0000-0000-000000000002';
 
   -- 3. Group + Knockout Tournament (Stage 1: Groups A & B -> Stage 2: Final with GROUP_RANK)
   insert into public.tournaments (
@@ -1718,10 +1726,10 @@ begin
 
   -- Stage 1 Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
   ) values (
     '65000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003',
-    1, 'published', 1, '{"fixtures_count": 2}'::jsonb, now(), v_owner
+    1, 'draft', 1, '{"fixtures_count": 2}'::jsonb
   ) on conflict (draw_revision_id) do nothing;
 
   -- Stage 1 Fixtures
@@ -1740,6 +1748,10 @@ begin
     ('70000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'B', 'entry', 'e0000000-0000-0000-0000-000000000011')
   on conflict (fixture_id, side) do nothing;
 
+  update public.tournament_draw_revisions
+  set status = 'published', published_at = now(), published_by = v_owner
+  where draw_revision_id = '65000000-0000-0000-0000-000000000003';
+
   -- Stage 2: Playoffs (Elimination)
   insert into public.tournament_stages (stage_id, tournament_id, sequence, name, competition_format, state)
   values ('50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003', 2, 'Playoffs', 'single_elimination', 'pending')
@@ -1752,10 +1764,10 @@ begin
 
   -- Stage 2 Draw Revision
   insert into public.tournament_draw_revisions (
-    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot, published_at, published_by
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
   ) values (
     '65000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003',
-    1, 'published', 1, '{"fixtures_count": 1}'::jsonb, now(), v_owner
+    1, 'draft', 1, '{"fixtures_count": 1}'::jsonb
   ) on conflict (draw_revision_id) do nothing;
 
   -- Stage 2 Fixtures
@@ -1769,6 +1781,10 @@ begin
     ('70000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000004', 'A', 'group_rank', '55000000-0000-0000-0000-000000000001', 1),
     ('70000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000004', 'B', 'group_rank', '55000000-0000-0000-0000-000000000002', 1)
   on conflict (fixture_id, side) do nothing;
+
+  update public.tournament_draw_revisions
+  set status = 'published', published_at = now(), published_by = v_owner
+  where draw_revision_id = '65000000-0000-0000-0000-000000000004';
 
   raise notice 'Canonical tournament structure seeded successfully (Single Elimination, Round Robin, Group+Knockout).';
 end $seed_tournaments$;

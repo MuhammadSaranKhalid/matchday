@@ -214,8 +214,6 @@ create trigger trg_fixture_slot_integrity
   before insert or update on public.tournament_fixture_slots
   for each row execute function public.enforce_fixture_slot_integrity();
 
--- Published draw protection: once a draw revision is published or superseded,
--- fixture slots belonging to it cannot be deleted or have their structural topology mutated.
 create or replace function public.enforce_fixture_slot_published_draw_protection()
 returns trigger
 language plpgsql
@@ -223,8 +221,22 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_status public.tournament_draw_revision_status;
+  v_status        public.tournament_draw_revision_status;
+  v_target_status public.tournament_draw_revision_status;
 begin
+  if tg_op = 'INSERT' then
+    select r.status into v_status
+    from public.tournament_fixtures f
+    join public.tournament_draw_revisions r on r.draw_revision_id = f.draw_revision_id
+    where f.fixture_id = new.fixture_id;
+
+    if v_status in ('published', 'superseded') then
+      raise exception 'Cannot add fixture slot to a published or superseded draw revision'
+        using errcode = '22000';
+    end if;
+    return new;
+  end if;
+
   if tg_op = 'DELETE' then
     select r.status into v_status
     from public.tournament_fixtures f
@@ -260,6 +272,19 @@ begin
           using errcode = '22000';
       end if;
     end if;
+
+    if new.fixture_id <> old.fixture_id then
+      select r.status into v_target_status
+      from public.tournament_fixtures f
+      join public.tournament_draw_revisions r on r.draw_revision_id = f.draw_revision_id
+      where f.fixture_id = new.fixture_id;
+
+      if v_target_status in ('published', 'superseded') then
+        raise exception 'Cannot move fixture slot into a published or superseded draw revision'
+          using errcode = '22000';
+      end if;
+    end if;
+
     return new;
   end if;
 
@@ -270,7 +295,7 @@ $$;
 revoke execute on function public.enforce_fixture_slot_published_draw_protection() from public;
 
 create trigger trg_fixture_slots_draw_revision_published_protection
-  before update or delete on public.tournament_fixture_slots
+  before insert or update or delete on public.tournament_fixture_slots
   for each row execute function public.enforce_fixture_slot_published_draw_protection();
 
 create trigger trg_tournament_fixture_slots_set_updated_at

@@ -19,9 +19,9 @@ create table public.tournament_stage_entries (
   constraint fk_stage_entries_entry_tournament foreign key (entry_id, tournament_id)
     references public.tournament_entries(entry_id, tournament_id) on delete restrict,
   constraint fk_stage_entries_group_stage foreign key (group_id, stage_id)
-    references public.tournament_groups(group_id, stage_id) on delete set null,
+    references public.tournament_groups(group_id, stage_id) on delete set null (group_id),
   constraint fk_stage_entries_source_stage_tournament foreign key (source_stage_id, tournament_id)
-    references public.tournament_stages(stage_id, tournament_id) on delete set null,
+    references public.tournament_stages(stage_id, tournament_id) on delete restrict,
   constraint uq_stage_entries_stage_entry unique (stage_id, entry_id),
   constraint uq_stage_entries_id_stage unique (stage_entry_id, stage_id),
   constraint uq_stage_entries_id_tournament unique (stage_entry_id, tournament_id),
@@ -105,27 +105,63 @@ create trigger trg_stage_entry_integrity
   before insert or update on public.tournament_stage_entries
   for each row execute function public.enforce_stage_entry_integrity();
 
--- Published draw protection: cannot delete stage entry referenced by published or superseded draw revision
+-- Published draw protection:
+-- 1. Cannot delete any stage entry in a stage whose draw is published/superseded.
+-- 2. Cannot alter structural identity or placement fields (entry_id, group_id, seed, source_stage_id) in a published stage.
+-- 3. Operational competition status (active, eliminated, advanced, withdrawn) remains mutable.
 create or replace function public.trg_stage_entries_published_draw_protection()
 returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_is_published boolean;
 begin
-  if exists (
-    select 1
-    from public.tournament_fixture_slots fs
-    join public.tournament_fixtures f on f.fixture_id = fs.fixture_id
-    join public.tournament_draw_revisions dr on dr.draw_revision_id = f.draw_revision_id
-    where dr.status in ('published', 'superseded')
-      and fs.stage_id = old.stage_id
-      and (fs.source_entry_id = old.entry_id or fs.resolved_entry_id = old.entry_id)
-  ) then
-    raise exception 'Cannot delete stage entry % referenced by published or superseded draw revision', old.stage_entry_id
-      using errcode = '22000';
+  if tg_op = 'DELETE' then
+    select exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) into v_is_published;
+
+    if v_is_published then
+      raise exception 'Cannot delete stage entry % in a stage with a published or superseded draw revision', old.stage_entry_id
+        using errcode = '22000';
+    end if;
+    return old;
   end if;
-  return old;
+
+  if tg_op = 'UPDATE' then
+    if new.stage_id <> old.stage_id
+       or new.tournament_id <> old.tournament_id
+       or new.entry_id <> old.entry_id then
+      raise exception 'stage_id, tournament_id, and entry_id on stage entries are immutable'
+        using errcode = '22000';
+    end if;
+
+    select exists (
+      select 1
+      from public.tournament_draw_revisions dr
+      where dr.stage_id = old.stage_id
+        and dr.status in ('published', 'superseded')
+    ) into v_is_published;
+
+    if v_is_published then
+      if new.group_id is distinct from old.group_id
+         or new.seed is distinct from old.seed
+         or new.source_stage_id is distinct from old.source_stage_id
+         or new.qualification_source is distinct from old.qualification_source
+         or new.entered_at is distinct from old.entered_at then
+        raise exception 'Structural fields (group_id, seed, source_stage_id, qualification_source, entered_at) of a stage entry in a published stage cannot be altered'
+          using errcode = '22000';
+      end if;
+    end if;
+    return new;
+  end if;
+
+  return null;
 end;
 $$;
 
@@ -133,7 +169,7 @@ revoke execute on function public.trg_stage_entries_published_draw_protection() 
 
 drop trigger if exists trg_stage_entries_published_draw_protection on public.tournament_stage_entries;
 create trigger trg_stage_entries_published_draw_protection
-  before delete on public.tournament_stage_entries
+  before update or delete on public.tournament_stage_entries
   for each row execute function public.trg_stage_entries_published_draw_protection();
 
 create trigger trg_tournament_stage_entries_set_updated_at

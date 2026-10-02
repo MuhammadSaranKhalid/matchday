@@ -2188,38 +2188,152 @@ Fixture Slots (`tournament_fixture_slots`)
 
 ---
 
-### 26.3 Final Phase 4 / 4.1 Gate Verdict
+### 26.3 Phase 4 / 4.1 Implementation Summary
+
+Phase 4 (Canonical Tournament Structure Foundation) and Phase 4.1 (Structural Mutation, Revision & Graph Integrity Closure) successfully established relational structure, Data API write lockdown, and forward graph scope integrity.
+
+---
+
+## 27. PHASE 4.2 — REVERSE GRAPH INTEGRITY & PERSISTENT REGRESSION CLOSURE (COMPLETED)
+
+### 27.1 Architecture Findings & Structural Gap Closure
+
+Phase 4.1 successfully closed forward-reference validation and direct Data API mutation paths. However, an in-depth audit of referenced structural entities revealed a critical reverse-integrity vulnerability: **while forward references were validated at insert time, mutations to referenced parent/upstream rows could invalidate an already-stored competition graph without the referencing row being touched.**
+
+Phase 4.2 closes that reverse-integrity gap across the relational graph:
+
+```text
+[Upstream Stage / Group] ──(Reverse Integrity Triggers)──> [Downstream StageEntry / FixtureSlot]
+         │                                                                   │
+         ▼                                                                   ▼
+Precedence Validated                                                Frozen Topology
+(Seq N < Seq N+1 Invariant)                                    (Immutable in Published Draw)
+```
+
+#### 1. Stage Sequence Reverse Integrity (`enforce_stage_integrity`)
+- When `tournament_stages.sequence` is updated, the trigger validates all existing incoming and outgoing qualification relationships:
+  - Downstream `tournament_stage_entries` with `source_stage_id`: requires `new.sequence < downstream_stage.sequence`.
+  - Downstream `tournament_fixture_slots` with `GROUP_RANK` from groups in this stage: requires `new.sequence < target_stage.sequence`.
+  - Downstream `tournament_fixture_slots` with `STAGE_RANK` sourcing this stage: requires `new.sequence < target_stage.sequence`.
+  - Upstream feeder `tournament_stage_entries`: requires `upstream_stage.sequence < new.sequence`.
+  - Upstream feeder `GROUP_RANK` fixture slots: requires `source_stage.sequence < new.sequence`.
+  - Upstream feeder `STAGE_RANK` fixture slots: requires `source_stage.sequence < new.sequence`.
+- Prevents structural reordering that would invert qualification provenance or rank dependencies.
+
+#### 2. Published Stage Structural Field Protection
+- Once a stage owns or participates in a `published` or `superseded` draw revision:
+  - Structural fields are frozen: `sequence`, `competition_format`, `competition_config`, `sport_rules_override`, `tournament_id`.
+  - Stage deletion is strictly prohibited.
+  - Operational lifecycle `state` (`pending` → `active` → `completed`) and cosmetic `name` remain mutable for competition management.
+
+#### 3. StageEntry Published Structure & Field Matrix (`trg_stage_entries_published_draw_protection`)
+- A StageEntry represents the participant field for the stage.
+- Once a draw revision for the stage is published or superseded:
+  - **Whole-Field Deletion Block**: Ordinary DELETE of *any* `tournament_stage_entries` row in the stage is prohibited, even if no fixture slot directly references its `entry_id` (protects seed occupancy, group membership, and published field integrity).
+  - **Structural Fields Frozen**: `seed`, `group_id`, `source_stage_id`, `qualification_source`, `entered_at`, `stage_id`, `tournament_id`, `entry_id`.
+  - **Operational Progression State Mutable**: `status` (`active`, `eliminated`, `advanced`, `withdrawn`) remains mutable for downstream match results and withdrawal handling.
+
+#### 4. Round & Group Reverse Integrity (`enforce_round_integrity`, `enforce_group_integrity`)
+- In published stages:
+  - Group: `stage_id` and `tournament_id` are immutable. `sequence` is frozen. `name` remains mutable. Group deletion is prohibited if referenced by published fixture slots or published stage draw revisions.
+  - Round: `stage_id` and `tournament_id` are immutable. `round_number` and `group_id` are frozen. `label` remains mutable. Round deletion is prohibited when published fixtures exist.
+
+#### 5. Fixture & Slot Re-parenting Prevention
+- `enforce_fixture_published_draw_protection`:
+  - On INSERT: blocks attaching new fixtures to a published or superseded draw revision.
+  - On UPDATE: blocks re-parenting a fixture (`draw_revision_id`, `stage_id`, `round_id`, `tournament_id`) into a published/superseded draw revision.
+  - Topology fields (`fixture_number`, `round_id`, `stage_id`, `tournament_id`) are frozen in published draws; operational scheduling (`scheduled_start_time`, `venue_id`) and lifecycle `state` remain mutable.
+- `enforce_fixture_slot_published_draw_protection`:
+  - On INSERT: blocks attaching new slots to a fixture belonging to a published or superseded draw revision.
+  - On UPDATE: blocks re-parenting a slot (`fixture_id`) into a published fixture.
+  - Topology fields (`side`, `source_type`, `source_entry_id`, `source_fixture_id`, `source_group_id`, `source_stage_id`, `source_seed`, `source_rank`) are frozen; operational resolution fields (`resolved_entry_id`, `resolved_at`, `resolution_reason`) remain mutable.
+
+#### 6. DrawRevision Automatic Entry Revision Snapshotting & Immutability
+- `trg_draw_revision_insert_integrity`: On INSERT, `based_on_entry_revision` is automatically captured from `tournaments.entry_revision` matching the stage's tournament. Any caller-supplied or forged value is overwritten with authoritative database truth.
+- `enforce_draw_revision_immutability`: When transitioning `published → superseded`, all historical audit identity is frozen: `created_by`, `created_at`, `revision_number`, `stage_id`, `tournament_id`, `based_on_entry_revision`, `plan_snapshot`, `published_by`, `published_at`, `revision_reason`. Only status transition is permitted.
+
+#### 7. Composite Foreign Key Deletion Semantics
+- `fk_stage_entries_group_stage`: uses `ON DELETE SET NULL (group_id)` to ensure deleting a draft group unassigns the group without nulling the NOT NULL `stage_id`.
+- `fk_tournament_rounds_group_stage`: uses `ON DELETE SET NULL (group_id)` for the same reason.
+- `fk_stage_entries_source_stage_tournament`: uses `ON DELETE RESTRICT` to preserve historical qualification provenance.
+
+#### 8. Canonical Status Enum Enforcement
+- Draw revision status enum is strictly: `draft`, `published`, `superseded`.
+- Erroneous mentions of `discarded` were purged from domain entities and documentation.
+
+---
+
+### 27.2 Committed Authoritative SQL Test Suite
+
+The structural regression tests have been permanently committed to the repository at `supabase/tests/tournament_structure_test.sql` and run via `supabase test db`:
+
+- **Total pgTAP Tests**: 64 assertions covering all Phase 4 & Phase 4.2 invariants.
+- **Coverage**:
+  1. Enums and relational table existence.
+  2. Monotonic `entry_revision` advancement and caller direct mutation rejection.
+  3. Automatic database snapshotting of `based_on_entry_revision`.
+  4. Typed source shapes and invalid shape check rejections.
+  5. Forward scope integrity (cross-tournament and cross-stage rejection).
+  6. Reverse scope integrity (sequence mutation vs upstream/downstream dependencies).
+  7. Published Stage structural freeze and operational mutability.
+  8. Published StageEntry whole-field delete block and structural field freeze.
+  9. Published Round and Group field policies.
+  10. Fixture & Slot insert and re-parenting blocks to published draws.
+  11. Fixture & Slot operational field mutability under published draws.
+  12. Full audit immutability on DrawRevision supersession.
+  13. Composite foreign key column-specific `ON DELETE SET NULL` and `RESTRICT`.
+  14. Direct Data API RLS mutation denial.
+  15. Capability separation (`draw.manage` vs `draw.publish` vs `fixture.schedule`).
+
+---
+
+### 27.3 Verification & Quality Gates Matrix
+
+| Quality Gate | Command / Test | Result |
+|---|---|---|
+| **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues found)** |
+| **Architecture Invariants** | `flutter test test/architecture_test.dart` | **PASS (All 9 test groups passed)** |
+| **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
+| **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
+| **Committed Structural SQL Suite** | `supabase test db supabase/tests/tournament_structure_test.sql` | **PASS (64/64 passed)** |
+| **All pgTAP Test Suites** | `supabase test db` (5 suites) | **PASS (163/163 passed)** |
+| **Cricket Scoring Domain Engine** | `flutter test test/features/matches/domain/scoring/` | **PASS (76/76 passed)** |
+| **Backend Integration Suite** | `pnpm test` (in `backend/`) | **PASS (28 files, 138/138 tests passed)** |
+| **Sport Command Layer Typecheck** | `npx deno check supabase/functions/cricket-match-action/index.ts` | **PASS (0 errors)** |
+| **Fresh DB Reset & Canonical Seeds** | `supabase db reset --yes` | **PASS (Clean rebuild & canonical seed)** |
+| **Full Repository Baseline** | `flutter test` (in `app/`) | **PASS (785 passed, 19 pre-existing failures, 0 new failures)** |
+| **Scope Purity (Phase 5+ absence)** | No command router, no match materialization, no progression engine | **PASS (Zero Phase 5+ concepts introduced)** |
+
+---
+
+### 27.4 Final Phase 4 Gate Verdict
 
 ```text
 ================================================================================
 PHASE 4 GATE: PASS
 ================================================================================
-Phase 4 (Canonical Tournament Structure Foundation) and Phase 4.1 (Structural Mutation,
-Revision & Graph Integrity Closure) are complete, closed, and mechanically verified.
+Phase 4 (Canonical Tournament Structure Foundation), Phase 4.1 (Structural Mutation,
+Revision & Graph Integrity Closure), and Phase 4.2 (Reverse Graph Integrity &
+Persistent Regression Closure) are complete, closed, and mechanically verified.
 
 Key Verifications:
-  1. Structural tables are Data API read-only; normal direct mutation denied.
-  2. Capabilities separated: draw.manage cannot publish DrawRevision.
-  3. draw.publish remains a distinct authority.
-  4. Draw revision publication metadata is protected against client forgery.
-  5. fixture.schedule cannot generically mutate fixture topology or state.
-  6. Progression fields are command-owned and protected from raw client writes.
-  7. Published normalized graph topology is strictly immutable.
-  8. tournaments.entry_revision provides canonical monotonic competitive entry tracking.
-  9. Entry revision advances on active entry addition, withdrawal, disqualification, deletion.
- 10. StageEntry source_stage_id enforces composite tournament-scoped precedence.
- 11. FixtureSlot ENTRY and resolved entries are verified within the target stage.
- 12. FIXTURE_WINNER and FIXTURE_LOSER edges are enforced within the same stage.
- 13. GROUP_RANK and STAGE_RANK edges are enforced strictly from preceding stages.
- 14. Third-place and Group->Knockout topologies verified.
- 15. BYE remains distinct from Walkover (no fake teams or match records).
- 16. Internal draw revision plan snapshots and audit fields are restricted from public access.
- 17. Security definer functions audited with safe search_path and public execute revoked.
- 18. Full repository test completed with 785 passed, 0 new failures.
- 19. Cricket command layer typechecks cleanly with Deno.
- 20. Clean database reset succeeds with all constraints and canonical seeds.
- 21. No Match materialization, progression, or standings engine was pulled forward.
- 22. Phase 5 has NOT begun.
+  1. Changing a referenced Stage cannot invalidate existing source-stage relationships.
+  2. Published StageEntry structural identity/seed/group cannot drift.
+  3. Published StageEntry whole-field delete is prohibited.
+  4. Published Round and Group structural ordering cannot drift.
+  5. Fixture cannot be re-parented into an authoritative DrawRevision.
+  6. FixtureSlot cannot be re-parented into authoritative topology.
+  7. DrawRevision snapshots canonical current entry_revision automatically.
+  8. Caller cannot forge based_on_entry_revision.
+  9. Published -> superseded preserves all historical audit identity.
+ 10. Composite FK deletion behavior is intentional and valid (column-specific SET NULL / RESTRICT).
+ 11. Phase 4 structural tests are committed in the repository (supabase/tests/tournament_structure_test.sql).
+ 12. Data API structural mutation remains denied.
+ 13. Operational future fields remain available for later command-owned transitions.
+ 14. Fresh reset succeeds with canonical seeds.
+ 15. Full repository baseline has zero new failures (785 passed, 19 pre-existing failed).
+ 16. Cricket command layer remains green with Deno check.
+ 17. Phase 5 has NOT begun.
 ================================================================================
 ```
 

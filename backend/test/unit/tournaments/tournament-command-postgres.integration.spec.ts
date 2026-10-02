@@ -603,4 +603,50 @@ describe('Tournament Command Infrastructure PostgreSQL Integration', () => {
       );
     });
   });
+
+  it('Requirement 6 (serialization rollback): normalizeCommandResult failure after handler execution rolls back probe row and saves no receipt', async () => {
+    // This test proves that if normalizeCommandResult throws AFTER the handler
+    // has executed side-effects (e.g., writing a probe row within the same
+    // transaction) but BEFORE the receipt is persisted, the entire transaction
+    // is rolled back atomically. This is distinct from Req 43 (handler throws)
+    // which tests failure during handler execution itself.
+    const commandId = 'c0000000-0000-4000-8000-000000000007';
+    const command: TournamentCommand<{ label: string }> = {
+      commandId,
+      action: 'serialize_fail_action',
+      resources: { tournamentId: testTournamentId },
+      payload: { label: 'serialization-rollback-probe' },
+    };
+
+    // Handler writes a probe row successfully, then returns a BigInt value
+    // which normalizeCommandResult will refuse to serialize.
+    const handlerWithBadResult: TournamentCommandHandler<typeof command, unknown> = {
+      execute: async (ctx, cmd) => {
+        // Side-effect: write probe row (this succeeds inside the transaction)
+        await ctx.tx.query(
+          `INSERT INTO public.test_tournament_command_probe (command_id, counter) VALUES ($1, 777)`,
+          [cmd.commandId],
+        );
+        // Return a non-serializable value to trigger normalizeCommandResult failure
+        // after the handler has completed but before the receipt is persisted.
+        return { invalidValue: BigInt(42) };
+      },
+    };
+
+    // The executor must throw (BigInt is not JSON-serializable)
+    await expect(executor.execute(userA, command, handlerWithBadResult)).rejects.toThrow(
+      /BigInt/i,
+    );
+
+    // Assert: probe row must be ABSENT — the entire transaction was rolled back
+    const probeResult = await pool.query(
+      `SELECT count(*)::int as count FROM public.test_tournament_command_probe WHERE command_id = $1`,
+      [commandId],
+    );
+    expect(probeResult.rows[0]?.count).toBe(0);
+
+    // Assert: receipt must be ABSENT — no receipt was persisted
+    const receipt = await receiptRepo.findReceipt(pool as never, commandId);
+    expect(receipt).toBeNull();
+  });
 });

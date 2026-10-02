@@ -2347,17 +2347,26 @@ Tournament write mutations are strictly owned by the NestJS backend command exec
 
 ```text
 Flutter
-   ↓
-NestJS Tournament API
-   ↓
-Tournament Application Commands
-   ↓
-ONE PostgreSQL transaction (withCommandTransaction)
-   ↓
-Supabase PostgreSQL
+  ├── Tournament commands
+  │       ↓
+  │    NestJS Tournament API
+  │       ↓
+  │    withCommandTransaction (trusted role + JWT claim injection)
+  │       ↓
+  │    PostgreSQL
+  │
+  ├── Cricket sport commands
+  │       ↓
+  │    cricket-match-action (Supabase Edge Function)
+  │       ↓
+  │    PostgreSQL
+  │
+  └── Reads
+          ↓
+       PostgREST / Views / Read RPCs
 ```
 
-No Edge Function `supabase/functions/tournament-action` exists or will be created.
+No Edge Function `supabase/functions/tournament-action` exists or will be created. There is no synchronous HTTP chaining between NestJS and cricket-match-action.
 
 ### 28.2 Authorization and Security Boundaries
 

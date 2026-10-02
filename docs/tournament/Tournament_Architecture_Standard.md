@@ -22970,51 +22970,71 @@ This is the first point where our target architecture is becoming very concrete.
 
 > **UPDATED (Phase 5, 2026-10-02)** — replaces the historical "no NestJS" diagram below.
 
-The actual implemented architecture:
+The canonical write architecture establishes **parallel command boundaries** for Tournament and Cricket operations:
 
 ```text
-                    FLUTTER
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-       QUERIES                   COMMANDS
-          │                         │
-          ▼                         ▼
-    PostgREST / Views       NestJS Tournament HTTP API
-    Read RPCs               ┌──────────────────────────┐
-    Realtime                │ TournamentCommandExecutor│
-                            │ withCommandTransaction   │
-                            └──────────┬───────────────┘
-                                       │
-                                       │ (trusted role, JWT claims injected)
-                                       ▼
-                               ┌───────────────┐
-                               │ cricket-match │  ← Sport commands only
-                               │ -action (EF)  │
-                               └───────┬───────┘
-                                       │
-                                       ▼
-                                  PostgreSQL
-                         ┌──────────────────────────┐
-                         │ constraints              │
-                         │ FK / UNIQUE / CHECK      │
-                         │ advisory locks           │
-                         │ RLS                      │
-                         │ public.can() helper      │
-                         │ private.tournament_      │
-                         │   command_receipts       │
-                         │ projections/read SQL     │
-                         └──────────┬───────────────┘
-                                    │
-                               COMMITTED EVENT
-                                    │
-                     ┌──────────────┼──────────────┐
-                     ▼              ▼              ▼
-                  Realtime     Notification       Chat
-                                / Outbox          / Feed
+                                FLUTTER
+                                   │
+                 ┌─────────────────┼─────────────────┐
+                 │                 │                 │
+               READS       TOURNAMENT COMMANDS   CRICKET COMMANDS
+                 │                 │                 │
+                 ▼                 ▼                 ▼
+        PostgREST / Views   NestJS HTTP API    cricket-match-action
+        Read RPCs / Cache          │           Supabase Edge Function
+                 │                 │ (withCommandTx) │
+                 │                 ▼                 │
+                 │          TournamentCommand        │
+                 │              Executor             │
+                 │                 │                 │
+                 └─────────────────┼─────────────────┘
+                                   ▼
+                               PostgreSQL
+                      ┌──────────────────────────┐
+                      │ constraints              │
+                      │ FK / UNIQUE / CHECK      │
+                      │ advisory locks           │
+                      │ RLS                      │
+                      │ public.can() helper      │
+                      │ private.tournament_      │
+                      │   command_receipts       │
+                      │ projections/read SQL     │
+                      └────────────┬─────────────┘
+                                   │
+                             COMMITTED EVENT
+                                   │
+                   ┌───────────────┼───────────────┐
+                   ▼               ▼               ▼
+                Realtime      Notification        Chat
+                               / Outbox          / Feed
 ```
 
-This is enough infrastructure for a serious Tournament platform.
+Or conceptually:
+
+```text
+Flutter
+  ├── Tournament commands
+  │       ↓
+  │    NestJS Tournament API
+  │       ↓
+  │    withCommandTransaction (trusted role + JWT claim injection)
+  │       ↓
+  │    PostgreSQL
+  │
+  ├── Cricket sport commands
+  │       ↓
+  │    cricket-match-action (Supabase Edge Function)
+  │       ↓
+  │    PostgreSQL
+  │
+  └── Reads
+          ↓
+       PostgREST / Views / Read RPCs
+```
+
+> **CRITICAL ATOMICITY INVARIANT & WARNING:**
+> There is **NO** synchronous HTTP chaining between command boundaries (`NestJS → cricket-match-action` or `cricket-match-action → NestJS HTTP` are strictly prohibited for competition-critical mutations).
+> Cricket match finalization and tournament progression (standings, bracket advancement, qualification) must eventually share **one atomic PostgreSQL transaction boundary**. The exact cross-subsystem coordination architecture is explicitly deferred to Phase 8 / 10.
 
 ---
 

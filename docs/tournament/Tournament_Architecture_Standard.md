@@ -20788,23 +20788,29 @@ The next step I would make **Step 12 — Command Model, Application Services & T
 
 
 
-Yes. And with your clarification, I would now freeze the current backend shape as:
-
-```text
-Flutter
-   │
-   ├── Read queries
-   │      ↓
-   │   Supabase Data API / PostgREST / RPC read models
-   │
-   └── Domain commands
-          ↓
-      Supabase Edge Functions
-          ↓
-       PostgreSQL
-```
-
-There is **no NestJS application server in the current architecture**, and Step 12 does not require one. Supabase Edge Functions are specifically intended for custom server-side TypeScript logic, and they can connect to Postgres directly; Supabase's current guidance also distinguishes Edge Functions from database functions, recommending database functions particularly for data-intensive database-local work. :chatgpt-content-reference{index="0"}
+> **CANONICAL ARCHITECTURE UPDATE (Phase 5, 2026-10-02)**
+> The text below originally assumed Supabase Edge Functions for all commands.
+> As implemented in Phase 5, **the canonical Tournament write path is NestJS + PostgreSQL (Supabase)**:
+>
+> ```text
+> Flutter
+>     │
+>     ├── Read queries
+>     │      ↓
+>     │   Supabase Data API / PostgREST / RPC read models
+>     │
+>     └── Tournament domain commands
+>            ↓
+>         NestJS Tournament HTTP API
+>            ↓
+>         TournamentCommandExecutor (withCommandTransaction)
+>            ↓
+>         PostgreSQL
+> ```
+>
+> `cricket-match-action` remains the Sport Match command authority in Supabase Edge Functions.
+> No `supabase/functions/tournament-action` exists or will be created.
+> The architectural principles below (Command vs Query separation, lifecycle validation, advisory locking, idempotency, revision-based concurrency, explicit authorization, audit, outbox) remain valid and are implemented in NestJS — not in an Edge Function.
 
 # Step 12 — Command Model, Application Services & Transaction Boundaries
 
@@ -20927,67 +20933,42 @@ You already have a strong pattern in:
 supabase/functions/cricket-match-action/
 ```
 
-I would now introduce its tournament equivalent:
+> **HISTORICAL NOTE — superseded before Phase 5 implementation.**
+> The sections below originally proposed `supabase/functions/tournament-action` as the Tournament command authority. This was **never implemented**. Phase 5 delivered a NestJS command execution layer instead:
 
 ```text
-supabase/functions/tournament-action/
-```
-
-Conceptually:
-
-```text
-tournament-action
-│
-├── index.ts
-├── command_router.ts
-├── types.ts
-│
-├── commands/
-│      ├── create_tournament.ts
-│      ├── publish_tournament.ts
-│      ├── open_registration.ts
-│      ├── approve_registration.ts
-│      ├── lock_entries.ts
-│      ├── publish_draw.ts
-│      ├── reschedule_fixture.ts
-│      ├── declare_walkover.ts
-│      ├── correct_result.ts
-│      └── ...
-│
+backend/libs/modules/tournaments/src/
+├── tournaments.module.ts
+├── application/
+│   ├── command-executor/
+│   │   ├── tournament-command-executor.ts
+│   │   └── tournament-command-handler.ts
+│   ├── commands/
+│   └── handlers/
 ├── domain/
-│      ├── errors.ts
-│      ├── validation.ts
-│      └── policies.ts
-│
-├── repositories/
-│      ├── tournament_repository.ts
-│      ├── entry_repository.ts
-│      ├── fixture_repository.ts
-│      ├── authorization_repository.ts
-│      ├── audit_repository.ts
-│      └── outbox_repository.ts
-│
-└── realtime/
-       └── publisher.ts
+│   ├── command/
+│   │   ├── tournament-command.ts
+│   │   └── json-result.ts
+│   ├── ports/
+│   │   ├── tournament-root.repository.ts
+│   │   └── tournament-authorization.repository.ts
+│   └── errors/
+└── infrastructure/
+    └── persistence/
+        ├── postgres-tournament-root.repository.ts
+        └── postgres-tournament-authorization.repository.ts
 ```
 
-This is not a second backend product.
-
-It's simply your Supabase Edge Function application layer.
+This is the NestJS-resident command layer — not a Supabase Edge Function.
 
 ---
 
-# 12.3 “Application Service” does not mean NestJS
+# 12.3 Application Services in the NestJS architecture
 
-This terminology can be confusing.
-
-When I say:
-
-```text
-Tournament Application Service
-```
-
-I mean a TypeScript module inside the Supabase Edge Function responsible for coordinating domain actions.
+In the implemented architecture, the Application Service layer lives in NestJS:
+- `TournamentCommandExecutor` orchestrates execution, advisory locking, idempotency, revision checks, capability authorization, transaction lifecycle, and receipt recording.
+- Individual command handlers implement `TournamentCommandHandler<C, R>` to coordinate domain logic for specific commands.
+- All transactional work runs inside `withCommandTransaction`.
 
 For example:
 
@@ -20995,7 +20976,7 @@ For example:
 ApproveRegistrationHandler
 ```
 
-might coordinate:
+coordinates:
 
 ```text
 Registration
@@ -21004,72 +20985,30 @@ Audit
 Outbox
 ```
 
-inside one PostgreSQL transaction.
-
-There is no NestJS server involved.
+inside one PostgreSQL transaction managed by `withCommandTransaction`.
 
 ---
 
-# 12.4 One Tournament Edge Function or many?
+# 12.4 NestJS TournamentsModule command routing
 
-I recommend one logical command endpoint initially:
-
-```text
-tournament-action
-```
-
-similar to your existing:
+Rather than 25 independent endpoints or functions, Tournament commands are coordinated through one modular NestJS boundary:
 
 ```text
-cricket-match-action
-```
-
-with:
-
-```json
-action: "approve_registration"
-```
-
-or:
-
-```json
-action: "publish_draw"
-```
-
-rather than deploying:
-
-```text
-approve-registration
-reject-registration
-publish-draw
-reschedule-fixture
-assign-scorer
-...
-```
-
-as 25 independent Edge Functions.
-
-That would create duplication around:
-
-```text
-authentication
-error handling
-database setup
-transaction handling
-authorization
-command metadata
-logging
-```
-
-So:
-
-```text
-one Edge Function
+one NestJS TournamentsModule
 +
-many command handlers
+one TournamentCommandExecutor
++
+many TournamentCommandHandler<C, R> implementations
 ```
 
-is the cleaner model.
+This centralizes:
+- JWT authentication and actor claim extraction
+- Transaction-local PostgreSQL claims (`request.jwt.claim.*`)
+- Transactional advisory locking
+- Idempotency receipts in `private.tournament_command_receipts`
+- Concurrency checks (`tournaments.revision`, `tournaments.entry_revision`)
+- Explicit capability authorization via `public.can()`
+- Canonical JSON-domain result normalization
 
 ---
 
@@ -21098,7 +21037,7 @@ complete Cricket sporting result
 And use:
 
 ```text
-tournament-action
+NestJS Tournament API
 ```
 
 for:
@@ -21152,7 +21091,7 @@ are genuinely Cricket operations despite their names.
 So later I would separate them like this:
 
 ```text
-TOURNAMENT ACTION
+NESTJS TOURNAMENT API
 
 reschedule_fixture
 declare_walkover
@@ -21229,7 +21168,7 @@ has downstream effects
 Then it must go through:
 
 ```text
-tournament-action
+NestJS Tournament API
 ```
 
 or the relevant sport command function.
@@ -21488,9 +21427,9 @@ It should ensure impossible data cannot exist.
 
 ---
 
-# 12.12 Edge Function responsibility
+# 12.12 NestJS command handler responsibility
 
-Edge command handlers should own **behavior**.
+NestJS command handlers own **behavior**:
 
 Examples:
 
@@ -21503,14 +21442,12 @@ Which downstream slots need resolving?
 Should the tournament now become live?
 ```
 
-This division is already stated nicely in your Cricket function:
+This division remains our fundamental architectural rule:
 
 ```text
-PostgreSQL = integrity
-Edge = behavior
+PostgreSQL = integrity (constraints, triggers, RLS, audit, receipts)
+NestJS     = behavior (domain rules, lifecycle, authorization via public.can())
 ```
-
-I would keep that architectural rule.
 
 ---
 
@@ -21565,7 +21502,7 @@ and manual authorization inside each function.
 
 They do check authentication/organizer status, so they are not inherently unsafe.
 
-But long-term I would prefer workflow behavior to live behind our Edge command boundary.
+But long-term I would prefer workflow behavior to live behind our NestJS command boundary.
 
 Supabase currently recommends `SECURITY INVOKER` by default for database functions, and warns that `SECURITY DEFINER` functions run with the creator's privileges and need careful exposure/security handling. :chatgpt-content-reference{index="2"}
 
@@ -21614,11 +21551,13 @@ But canonical architecture should become:
 ```text
 Flutter
 ↓
-tournament-action
+NestJS Tournament HTTP API
 ↓
-TypeScript command handler
+Application Command
 ↓
-Postgres transaction
+withCommandTransaction
+↓
+PostgreSQL
 ```
 
 rather than having business behavior split unpredictably between TypeScript and PL/pgSQL.
@@ -22273,48 +22212,21 @@ This preserves strong competition consistency.
 
 ---
 
-# 12.33 How do we do that without NestJS?
+# 12.33 How do we achieve that with NestJS?
 
-Through shared TypeScript modules.
+> **HISTORICAL NOTE — superseded before Phase 5 implementation.**
+> This section originally addressed how to achieve atomic finalization within Supabase Edge Functions without NestJS. The atomic finalization problem it describes remains valid; the actual cross-subsystem coordination architecture is deferred to Phase 8 / Phase 10.
+
+Through shared domain logic and coordinated transactions.
 
 For example:
-
-```text
-supabase/functions/_shared/
-    tournament_competition/
-        finalize_fixture.ts
-        progression.ts
-        standings.ts
-        qualification.ts
-```
-
-Then:
-
-```text
-cricket-match-action
-```
-
-can call:
-
-```text
-finalizeTournamentFixture(
-    tx,
-    match,
-    sportingResult,
-)
-```
-
-using its **existing transaction**.
-
-No second Edge Function call.
-
-No HTTP-to-HTTP orchestration.
-
-No NestJS.
+- Cricket match finalization completes the sporting result in `cricket-match-action`.
+- Tournament progression (standings, bracket advancement, qualification) must coordinate atomically.
+- Cross-boundary synchronous HTTP calls between Edge Functions and NestJS are forbidden.
 
 ---
 
-# 12.34 Don't call `tournament-action` from `cricket-match-action`
+# 12.34 Don't call NestJS HTTP synchronously from `cricket-match-action`
 
 That would produce:
 
@@ -22330,15 +22242,7 @@ Transaction B
 
 which loses atomicity.
 
-Instead both Edge Functions share:
-
-```text
-application/domain modules
-```
-
-and whichever command begins the business transaction coordinates all required synchronous work.
-
-That's the right design.
+Cross-subsystem coordination between Cricket match completion and Tournament progression must not rely on uncoordinated synchronous HTTP calls between Edge Functions and NestJS. Atomic finalization and progression coordination is deferred to Phase 8 / Phase 10.
 
 ---
 
@@ -22986,7 +22890,7 @@ TournamentCommandDataSource
 for:
 
 ```text
-invoke tournament-action
+call NestJS Tournament HTTP API
 ```
 
 That alone would make the client architecture much easier to reason about.
@@ -23000,9 +22904,11 @@ Then domain repositories can expose meaningful methods.
 Rather than Flutter repeatedly doing:
 
 ```dart
-_supabase.functions.invoke(
-  'tournament-action',
+// HTTP POST to NestJS Tournament API
+await _httpClient.post(
+  '/tournaments/commands',
   body: {
+    'commandId': commandId,
     'action': '...',
     ...
   },
@@ -23062,7 +22968,9 @@ This is the first point where our target architecture is becoming very concrete.
 
 # 12.55 Canonical current deployment architecture
 
-With **no NestJS**, the architecture I would freeze is:
+> **UPDATED (Phase 5, 2026-10-02)** — replaces the historical "no NestJS" diagram below.
+
+The actual implemented architecture:
 
 ```text
                     FLUTTER
@@ -23072,20 +22980,29 @@ With **no NestJS**, the architecture I would freeze is:
        QUERIES                   COMMANDS
           │                         │
           ▼                         ▼
-    PostgREST / Views       Supabase Edge Functions
-    Read RPCs               ┌──────────────────────┐
-    Realtime                │ tournament-action    │
-                            │ cricket-match-action │
-                            └──────────┬───────────┘
+    PostgREST / Views       NestJS Tournament HTTP API
+    Read RPCs               ┌──────────────────────────┐
+    Realtime                │ TournamentCommandExecutor│
+                            │ withCommandTransaction   │
+                            └──────────┬───────────────┘
+                                       │
+                                       │ (trusted role, JWT claims injected)
+                                       ▼
+                               ┌───────────────┐
+                               │ cricket-match │  ← Sport commands only
+                               │ -action (EF)  │
+                               └───────┬───────┘
                                        │
                                        ▼
                                   PostgreSQL
                          ┌──────────────────────────┐
                          │ constraints              │
                          │ FK / UNIQUE / CHECK      │
-                         │ transactions / locking   │
+                         │ advisory locks           │
                          │ RLS                      │
-                         │ authorization helpers    │
+                         │ public.can() helper      │
+                         │ private.tournament_      │
+                         │   command_receipts       │
                          │ projections/read SQL     │
                          └──────────┬───────────────┘
                                     │
@@ -23097,36 +23014,36 @@ With **no NestJS**, the architecture I would freeze is:
                                 / Outbox          / Feed
 ```
 
-That is enough infrastructure for a serious Tournament platform.
-
-We do **not** need another application server simply to get clean architecture.
+This is enough infrastructure for a serious Tournament platform.
 
 ---
 
 # Step-12 standard to freeze
 
-1. **Current Matchday Tournament server architecture is Supabase Edge Functions + PostgreSQL; no NestJS service is assumed.**
+> **UPDATED (Phase 5, 2026-10-02)** — Items 1, 4, 8, 10, 11, 12, 13, 14, 16, 18, and 22 have been revised to reflect the NestJS command authority that was implemented in Phase 5. All other items remain valid.
+
+1. **Current Matchday Tournament write architecture is NestJS + PostgreSQL (Supabase).** Tournament mutations go through the NestJS `TournamentCommandExecutor`, which executes under a trusted database role with transaction-local JWT claim injection. No `tournament-action` Supabase Edge Function exists or will be created.
 2. **Reads and commands are separate concerns.**
 3. **Complex Tournament mutations go through an explicit server command boundary.**
-4. **`tournament-action` should become the Tournament equivalent of the existing `cricket-match-action`.**
+4. **The NestJS Tournament HTTP API is the Tournament command authority**, equivalent to how `cricket-match-action` is the Sport Match command authority. Cricket sport commands remain separated from Tournament competition commands.
 5. **Cricket sport commands remain separated from Tournament competition commands.**
 6. **Direct PostgREST mutations are only appropriate for genuinely simple non-lifecycle operations protected by correct RLS/invariants.**
 7. **Lifecycle, authority, entry, structure, fixture, progression and result mutations require commands.**
-8. **PostgreSQL owns persistence integrity; Edge command handlers own domain behavior/orchestration.**
+8. **PostgreSQL owns persistence integrity; NestJS command handlers own domain behavior/orchestration.**
 9. **Database functions/RPCs remain appropriate for database-local queries, aggregations and specialized primitives, but should not become a second competing workflow layer.**
-10. **Every command derives actor identity from authenticated server context, never request payload.**
-11. **Commands support idempotency via `commandId`.**
-12. **Concurrency-sensitive commands support expected revisions.**
-13. **The server locks authoritative state before applying critical transitions.**
-14. **Capability authorization and lifecycle/domain validation are separate steps.**
+10. **Every command derives actor identity from authenticated server context (verified JWT claims injected transaction-locally), never from the request payload.**
+11. **Commands support idempotency via `commandId` backed by `private.tournament_command_receipts`.**
+12. **Concurrency-sensitive commands support expected revisions (`tournaments.revision`, `tournaments.entry_revision`).**
+13. **The server acquires a transaction-scoped advisory lock (`pg_advisory_xact_lock`) before applying critical transitions.**
+14. **Capability authorization (`public.can()`) and lifecycle/domain validation are separate steps.**
 15. **Stable error codes replace UI parsing of exception messages.**
-16. **Successful commands should return canonical resulting state/revisions where useful, not merely `void`.**
+16. **Successful commands return a canonical JSON-domain result that is identical on first execution and idempotent replay.**
 17. **Tournament match result finalization and required Tournament progression should occur atomically in the same PostgreSQL transaction.**
-18. **Shared TypeScript modules—not cross-Edge-Function HTTP calls—coordinate Tournament progression from Cricket match finalization.**
+18. **`cricket-match-action` must NOT issue uncoordinated HTTP calls to NestJS for tournament progression.** Cross-subsystem atomicity between cricket match finalization and tournament progression is explicitly deferred to Phase 8 / 10.
 19. **Fixture outcome/progression replaces direct `prev_match_*` manipulation as the canonical future model.**
 20. **Audit records and outbox events are written transactionally with important mutations.**
 21. **Realtime, notifications, chat and feed processing happen after commit and can retry independently.**
-22. **RLS remains mandatory for Data API access, but privileged Edge command paths must also explicitly authorize the authenticated actor.**
+22. **RLS remains mandatory for Data API access; NestJS command paths must also explicitly authorize the authenticated actor via `public.can('tournament', id, permission)`.**
 23. **Flutter handles UX and typed command invocation; business transitions remain server-owned.**
 24. **Client repository architecture should eventually separate read/query access from command invocation.**
 

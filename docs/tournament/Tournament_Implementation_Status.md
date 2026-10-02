@@ -4,7 +4,7 @@
 **Date:** 2026-09-28  
 **Authoritative Standard:** [`docs/tournament/Tournament_Architecture_Standard.md`](file:///Users/redapple/Developer/personal/matchday/docs/tournament/Tournament_Architecture_Standard.md)  
 **Status:** Gap Audit Complete — Pre-Implementation Governance & Alignment  
-**Current Backend Topology:** Flutter Client → Supabase Edge Functions / PostgREST / RPCs → PostgreSQL (No NestJS service)
+**Current Backend Topology:** Flutter Client → NestJS Tournament HTTP API & Supabase Edge Functions (`cricket-match-action`) / PostgREST / RPCs → PostgreSQL
 
 ---
 
@@ -168,12 +168,12 @@ graph TD
         Coord --> ReadModels
     end
 
-    subgraph ServerCommands ["Supabase Edge Functions"]
-        TAction[tournament-action (Command Handler)]
-        CAction[cricket-match-action (Sport Action Handler)]
+    subgraph ServerCommands ["Server Command Boundaries"]
+        NestJSCmd["NestJS TournamentCommandExecutor (HTTP API)"]
+        CAction["cricket-match-action (Sport Action Handler)"]
         SharedCore[Shared PostgreSQL Command Engine]
         
-        TAction --> SharedCore
+        NestJSCmd --> SharedCore
         CAction --> SharedCore
     end
 
@@ -206,7 +206,7 @@ graph TD
         Broadcast[Topic: tournament:id]
     end
 
-    CmdClient --> TAction
+    CmdClient --> NestJSCmd
     ReadModels --> V_Detail
     ReadModels --> V_Bracket
     ReadModels --> V_Standings
@@ -251,8 +251,8 @@ Every relevant current component across Database, Edge Functions, and Flutter is
 | `public.role_permissions` | Default role-to-permission mapping | **KEEP + EXTEND** | Map capabilities to `tournament_owner` and `tournament_manager`. |
 | `public.grants` | Polymorphic direct grants | **KEEP + EXTEND** | Supports tournament-scoped direct grants. |
 | `is_tournament_organizer(uuid)` | Monolithic organizer RLS helper | **KEEP + EXTEND** | Retain for existing RLS policies; enhance to check both `created_by`/`organizers` and normalized `tournament_memberships`. |
-| `approve_tournament_registration(uuid)` | SQL RPC for registration approval | **REFACTOR** / **REPLACE** | Supersede with server command `ApproveRegistration` in `tournament-action` that atomically initializes `tournament_entries`. |
-| `reject_tournament_registration(uuid)` | SQL RPC for registration rejection | **REFACTOR** / **REPLACE** | Supersede with server command `RejectRegistration` in `tournament-action`. |
+| `approve_tournament_registration(uuid)` | SQL RPC for registration approval | **REFACTOR** / **REPLACE** | Supersede with server command `ApproveRegistration` in NestJS Tournament API that atomically initializes `tournament_entries`. |
+| `reject_tournament_registration(uuid)` | SQL RPC for registration rejection | **REFACTOR** / **REPLACE** | Supersede with server command `RejectRegistration` in NestJS Tournament API. |
 | `tournament_record_payment(...)` | SQL RPC for recording team fee | **KEEP + EXTEND** | Safe transactional function. Retain and integrate with entry fee ledger. |
 | `tournament_fee_ledger(uuid)` | Read RPC for tournament finances | **KEEP** | Effective read projection. |
 | `tournament_match_officials(uuid)` | Read RPC for fixture officials | **KEEP** | Retain for Officials management screen. |
@@ -271,14 +271,14 @@ Every relevant current component across Database, Edge Functions, and Flutter is
 | Component / File | Current Role | Target Classification | Target Disposition & Rationale |
 |---|---|---|---|
 | `cricket-match-action/commands/complete_cricket_match.ts` | Completes cricket match and advances winner | **REFACTOR** | Extract tournament progression out of cricket match action into shared transaction helper. Maintain atomic finalization. |
-| `cricket-match-action/commands/tournament_abandon_match.ts` | Reschedules or abandons tournament match | **REFACTOR** / **MIGRATE** | Fix critical bug: remove `deleteAllForMatch`. Migrate to dedicated `tournament-action` command. |
-| `cricket-match-action/commands/tournament_declare_walkover.ts` | Awards walkover and advances winner | **REFACTOR** / **MIGRATE** | Migrate to `tournament-action` command. Do not create fake cricket score. |
-| `cricket-match-action/commands/tournament_override_result.ts` | Admin override of match winner | **REFACTOR** / **MIGRATE** | Migrate to `tournament-action` command. Separate sporting score from competition outcome. |
-| `cricket-match-action/commands/tournament_reschedule_match.ts` | Changes scheduled time/venue | **REFACTOR** / **MIGRATE** | Migrate to `tournament-action` command. Check ground clashes. |
+| `cricket-match-action/commands/tournament_abandon_match.ts` | Reschedules or abandons tournament match | **REFACTOR** / **MIGRATE** | Fix critical bug: remove `deleteAllForMatch`. Migrate to dedicated NestJS Tournament command. |
+| `cricket-match-action/commands/tournament_declare_walkover.ts` | Awards walkover and advances winner | **REFACTOR** / **MIGRATE** | Migrate to dedicated NestJS Tournament command. Do not create fake cricket score. |
+| `cricket-match-action/commands/tournament_override_result.ts` | Admin override of match winner | **REFACTOR** / **MIGRATE** | Migrate to dedicated NestJS Tournament command. Separate sporting score from competition outcome. |
+| `cricket-match-action/commands/tournament_reschedule_match.ts` | Changes scheduled time/venue | **REFACTOR** / **MIGRATE** | Migrate to dedicated NestJS Tournament command. Check ground clashes. |
 | `cricket-match-action/commands/tournament_revise_match_conditions.ts` | Revises overs/target for rain | **KEEP** (in Cricket) | Purely a sport match operation; remains under `cricket-match-action`. |
 | `cricket-match-action/commands/tournament_trigger_super_over.ts` | Initiates super over for tie | **KEEP** (in Cricket) | Purely a sport match operation; remains under `cricket-match-action`. |
 | `cricket-match-action/repositories/match_team_repository.ts` | Contains `advanceWinner` & `clearAdvancedWinner` | **REFACTOR** | Replace brittle direct `prev_match_*` updates with topological slot source resolution. |
-| `supabase/functions/tournament-action` | Dedicated tournament command function | **NEW** / **REPLACE** | Implement single command router for tournament operations with `commandId`, idempotency, and revision checks. |
+| `supabase/functions/tournament-action` | Dedicated tournament command function | **ABSENT** / **NOT IMPLEMENTED** | Not created. Tournament command execution is implemented in NestJS (`backend/libs/modules/tournaments/`). |
 
 ### C. Flutter Components (`lib/features/tournaments/`)
 
@@ -297,7 +297,7 @@ Every relevant current component across Database, Edge Functions, and Flutter is
 | `domain/draw/draw_builder.dart` | Pure Dart draw generator | **REFACTOR** | Retain for client-side preview; server becomes sole authority for published draws. |
 | `domain/draw/draw_plan.dart` | Draft draw data structure | **REFACTOR** | Expand to represent multi-stage plans, groups, and explicit slot sources. |
 | `domain/repositories/tournaments_repository.dart` | Repository contract | **REFACTOR** | Separate read queries from typed server commands. |
-| `data/repositories/tournaments_repository_impl.dart` | Repository implementation | **REFACTOR** | Route mutations to `tournament-action` Edge Function; catch exceptions and map to `Either<Failure, T>`. |
+| `data/repositories/tournaments_repository_impl.dart` | Repository implementation | **REFACTOR** | Route mutations to NestJS Tournament HTTP API; catch exceptions and map to `Either<Failure, T>`. |
 | `data/datasources/tournaments_remote_datasource.dart` | Data source with direct PostgREST writes | **REFACTOR** | Eliminate direct table mutations for tournament status, groups, and withdrawals. Implement typed command caller. |
 | `presentation/providers/tournaments_providers.dart` | Riverpod presentation providers | **REFACTOR** | Replace fragmented invalidation with centralized Realtime Coordinator. |
 | `presentation/controllers/tournaments_controller.dart` | UI controller with direct status mutations | **REFACTOR** | Replace `startTournament`, `completeTournament`, etc. with typed command dispatches. Support entity-keyed mutation state. |
@@ -346,7 +346,7 @@ The implementation program follows a strict 19-phase sequential progression. No 
   - Implement fixture execution materialization (`tournament_fixture_matches`).
   - Implement atomic match finalization and slot resolution in shared PostgreSQL transaction engine.
 - **Phase 9: Tournament Operations & Exception Handling**
-  - Implement operational commands in `tournament-action`: `RescheduleFixture`, `DeclareWalkover`, `CorrectResult`, `AbandonMatch`.
+  - Implement operational commands in NestJS Tournament API: `RescheduleFixture`, `DeclareWalkover`, `CorrectResult`, `AbandonMatch`.
   - Remove destructive `deleteAllForMatch`; enforce non-destructive replay/abandonment invariants.
 - **Phase 10: Sport Competition Adapter / Standings / Ranking / Qualification**
   - Implement stage-scoped standings recalculation routines and tie-breaking pipelines.
@@ -665,7 +665,7 @@ Every test in `test/features/tournaments/baseline_safety_characterization_test.d
 1. **Match-Embedded Bracket Topology:** `Match` entity currently contains `round`, `bracketMatchNumber`, `bracketRoundNumber`, `prevMatchAId`, `prevMatchBId`.
    - *Target:* Decoupled into `tournament_fixtures` and `tournament_fixture_slots` in Phase 4.
 2. **Client-Driven Draw Generation:** `DrawBuilder` computes pairings on device and invokes RPC `tournament_generate_fixtures`.
-   - *Target:* Server-side command `PublishDraw` in `tournament-action` with topological validation in Phase 7.
+   - *Target:* Server-side command `PublishDraw` in NestJS Tournament API with topological validation in Phase 7.
 3. **Cricket-Coupled Standings Entity:** `TournamentStanding` embeds cricket metrics (`runsScored`, `oversFaced`, `netRunRate`).
    - *Target:* Generic `tournament_stage_standings` + `cricket_stage_standing_metrics` in Phase 10.
 4. **Client Direct Lifecycle Mutations:** Flutter controller directly mutates `tournaments.status` via PostgREST.
@@ -1048,11 +1048,11 @@ All direct mutations of `tournaments.status` across the entire codebase were aud
 
 | File & Line | Business Operation | Former Legacy Write | Phase 2.1 Canonical Lifecycle Write | Phase 5 Target |
 |---|---|---|---|---|
-| `tournaments_controller.dart:114` | Start Competition | `'status': 'live'` | `'publication_state': 'published'`, `'competition_state': 'in_progress'` | `tournament-action` RPC (`StartCompetition`) |
-| `tournaments_controller.dart:136` | Complete Competition | `'status': 'completed'` | `'competition_state': 'completed'` | `tournament-action` RPC (`CompleteCompetition`) |
-| `organizer_console_screen.dart:735` | Early Registration Close & Entry Lock | `'status': 'upcoming'` | `'registration_state': 'closed'`, `'entry_state': 'locked'` | `tournament-action` RPC (`CloseRegistration` / `LockEntries`) |
-| `tournaments_remote_datasource.dart:225` | Draft Tournament Creation | `'status': 'draft'` | Canonical columns: `publication_state: 'draft'`, `registration_state: 'not_open'`, `entry_state: 'editable'`, `competition_state: 'not_started'`, `termination_state: 'none'` | `tournament-create` command |
-| `tournaments_remote_datasource.dart:283` | Publish Tournament (from Wizard) | `.update({'status': 'registration'})` | `'publication_state': 'published'`, `'registration_state': 'open'` (Wizard UI explicitly prompts "Ready to open registrations?" confirming immediate opening) | `tournament-action` RPC (`PublishTournament` + `OpenRegistration`) |
+| `tournaments_controller.dart:114` | Start Competition | `'status': 'live'` | `'publication_state': 'published'`, `'competition_state': 'in_progress'` | NestJS Tournament API (`StartCompetition`) |
+| `tournaments_controller.dart:136` | Complete Competition | `'status': 'completed'` | `'competition_state': 'completed'` | NestJS Tournament API (`CompleteCompetition`) |
+| `organizer_console_screen.dart:735` | Early Registration Close & Entry Lock | `'status': 'upcoming'` | `'registration_state': 'closed'`, `'entry_state': 'locked'` | NestJS Tournament API (`CloseRegistration` / `LockEntries`) |
+| `tournaments_remote_datasource.dart:225` | Draft Tournament Creation | `'status': 'draft'` | Canonical columns: `publication_state: 'draft'`, `registration_state: 'not_open'`, `entry_state: 'editable'`, `competition_state: 'not_started'`, `termination_state: 'none'` | NestJS Tournament API (`CreateTournament`) |
+| `tournaments_remote_datasource.dart:283` | Publish Tournament (from Wizard) | `.update({'status': 'registration'})` | `'publication_state': 'published'`, `'registration_state': 'open'` (Wizard UI explicitly prompts "Ready to open registrations?" confirming immediate opening) | NestJS Tournament API (`PublishTournament` + `OpenRegistration`) |
 
 #### Transitional Architecture Note
 ```text
@@ -1070,11 +1070,11 @@ legacy tournaments.status (compatibility read-only)
 FUTURE PHASE 5+
 Flutter
     ↓
-tournament-action command (RPC / Edge Function)
+NestJS Tournament HTTP API
     ↓
 canonical lifecycle transaction + event outbox
 ```
-Explicit `// TODO(Phase 5): Replace temporary direct canonical write with tournament-action RPC` markers were added to all 5 call sites.
+Explicit `// TODO(Phase 5): Replace temporary direct canonical write with NestJS Tournament command` markers were added to all 5 call sites.
 
 ---
 
@@ -2133,7 +2133,7 @@ Fixture Slots (`tournament_fixture_slots`)
      - `tournament_draw_revisions`
      - `tournament_fixtures`
      - `tournament_fixture_slots`
-   - Normal `anon` and `authenticated` users (including Tournament Managers and Owners) cannot bypass the future command boundary (`tournament-action` in Phase 5).
+   - Normal `anon` and `authenticated` users (including Tournament Managers and Owners) cannot bypass the NestJS Tournament command boundary.
 2. **Capability Separation (`draw.manage` vs `draw.publish`)**:
    - Distinct granular capabilities enforced. `tournament.draw.manage` allows preparing draft structures, but cannot mark revisions published or superseded.
    - `tournament.draw.publish` is a distinct high-privilege capability required to publish authoritative draws.
@@ -2397,14 +2397,3 @@ No Edge Function `supabase/functions/tournament-action` exists or will be create
 ### 28.4 Deferred Progressions
 
 Cross-subsystem atomicity between cricket match finalization and tournament progression remains explicitly deferred to Phase 8 / 10. `cricket-match-action` must NOT issue uncoordinated HTTP calls to NestJS for progression.
-
-
-
-
-
-
-
-
-
-
-

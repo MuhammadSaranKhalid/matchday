@@ -1,15 +1,23 @@
 import { TournamentError } from '../errors/tournament-error-codes.js';
 
-export const RFC_UUID_PATTERN =
+export const POSTGRES_UUID_TEXT_PATTERN =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /**
- * Validates that a string conforms to RFC 4122/9562 128-bit UUID format (8-4-4-4-12 hex).
- * Accepts any RFC-compatible UUID version (v1-v8, nil, max) consistent with backend platform conventions.
+ * Validates that a value conforms to the PostgreSQL UUID textual format:
+ * eight-four-four-four-twelve lowercase or uppercase hex digits separated by hyphens.
+ *
+ * This validates the **textual shape** accepted by PostgreSQL's `uuid` column type.
+ * It does NOT enforce RFC 4122 / 9562 version or variant bits; all values that
+ * PostgreSQL would accept as a valid UUID literal (v1–v8, nil, max) are permitted.
+ *
+ * The important requirement for commandId is that it is a valid UUID accepted
+ * by the persistence contract — not that it is exclusively a particular version.
  */
 export function isValidUuid(value: unknown): value is string {
-  return typeof value === 'string' && RFC_UUID_PATTERN.test(value);
+  return typeof value === 'string' && POSTGRES_UUID_TEXT_PATTERN.test(value);
 }
+
 
 export interface TournamentCommandMetadata {
   readonly commandId: string;

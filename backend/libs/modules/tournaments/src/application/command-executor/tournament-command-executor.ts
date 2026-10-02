@@ -1,6 +1,10 @@
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { computeRequestFingerprint } from '../../domain/command/fingerprint.js';
 import {
+  type JsonValue,
+  normalizeCommandResult,
+} from '../../domain/command/json-result.js';
+import {
   type TournamentCommand,
   validateTournamentCommand,
 } from '../../domain/command/tournament-command.js';
@@ -12,52 +16,6 @@ import type {
   TournamentTransactionExecutor,
 } from '../ports/tournament-command.ports.js';
 import type { TournamentCommandReceiptRepository } from '../ports/tournament-repository.ports.js';
-
-/**
- * Asserts that a command execution result is JSON-serializable prior to receipt persistence.
- * Prevents scenarios where business mutations commit but receipt persistence fails or corrupts.
- */
-export function assertJsonSerializable(value: unknown, seen = new WeakSet<object>()): void {
-  if (value === null || value === undefined) {
-    return;
-  }
-  if (typeof value === 'bigint') {
-    throw new Error('Handler result contains unsupported BigInt; cannot serialize to JSON receipt');
-  }
-  if (typeof value === 'function' || typeof value === 'symbol') {
-    throw new Error(
-      `Handler result contains unsupported ${typeof value}; cannot serialize to JSON receipt`,
-    );
-  }
-  if (typeof value === 'number') {
-    if (Number.isNaN(value) || !Number.isFinite(value)) {
-      throw new Error(
-        'Handler result contains non-finite number (NaN/Infinity); cannot serialize to JSON receipt',
-      );
-    }
-    return;
-  }
-  if (typeof value === 'string' || typeof value === 'boolean') {
-    return;
-  }
-  if (typeof value === 'object') {
-    if (seen.has(value)) {
-      throw new Error(
-        'Handler result contains circular reference; cannot serialize to JSON receipt',
-      );
-    }
-    seen.add(value);
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        assertJsonSerializable(item, seen);
-      }
-      return;
-    }
-    for (const val of Object.values(value)) {
-      assertJsonSerializable(val, seen);
-    }
-  }
-}
 
 export class TournamentCommandExecutor {
   constructor(
@@ -102,23 +60,27 @@ export class TournamentCommandExecutor {
         commandId: command.commandId,
       };
 
-      const result = await handler.execute(context, command);
+      const rawResult = await handler.execute(context, command);
 
-      // 6. Validate result serializability before persisting receipt
-      assertJsonSerializable(result);
+      // 6. Canonicalize result — ONE normalization step that defines the value space.
+      //    Both the returned result AND the persisted receipt use this canonical value,
+      //    guaranteeing that first execution response === idempotent replay response.
+      //    Throws if the handler returned an unsupported non-JSON-domain value.
+      const canonicalResult: JsonValue = normalizeCommandResult(rawResult);
 
-      // 7. Atomically persist receipt in same transaction
+      // 7. Atomically persist canonical receipt in same transaction
       await this.receiptRepository.saveReceipt(tx, {
         commandId: command.commandId,
         actorId: principal.userId,
         action: command.action,
         tournamentId: command.resources.tournamentId ?? null,
         requestFingerprint: fingerprint,
-        responsePayload: result ?? null,
+        responsePayload: canonicalResult,
       });
 
+      // 8. Return the SAME canonical value — not the raw handler result
       return {
-        result,
+        result: canonicalResult as R,
         status: 'executed',
       };
     });
@@ -154,11 +116,10 @@ export class TournamentCommandExecutor {
       );
     }
 
-    // 3. Replay original response
+    // 3. Replay original response — the persisted responsePayload is already canonical
     return {
       result: existingReceipt.responsePayload as R,
       status: 'replayed',
     };
   }
 }
-

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/match_official.dart';
@@ -288,119 +287,9 @@ class TournamentsController extends _$TournamentsController {
     );
   }
 
-  Future<bool> withdrawRegistration(
-      String tournamentId, String registrationId) =>
-      withdrawPendingRegistration(tournamentId, registrationId);
 
 
-  Future<bool> assignTeamGroup({
-    required String tournamentId,
-    required String registrationId,
-    required String? groupId,
-  }) async {
-    final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.assignTeamGroup(
-      registrationId: registrationId,
-      groupId: groupId,
-    );
-    return result.fold(
-      (failure) {
-        _fail(failure);
-        return false;
-      },
-      (_) {
-        _refresh(() {
-          ref.invalidate(tournamentRegistrationsProvider(tournamentId));
-          ref.invalidate(tournamentStandingsStreamProvider(tournamentId));
-        });
-        return true;
-      },
-    );
-  }
 
-  Future<bool> assignMultipleTeamsGroup({
-    required String tournamentId,
-    required List<String> registrationIds,
-    required String? groupId,
-  }) async {
-    state = const AsyncLoading();
-    final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.assignMultipleTeamsGroup(
-      registrationIds: registrationIds,
-      groupId: groupId,
-    );
-    return result.fold(
-      (failure) {
-        _fail(failure);
-        return false;
-      },
-      (_) {
-        _ok();
-        _refresh(() {
-          ref.invalidate(tournamentRegistrationsProvider(tournamentId));
-          ref.invalidate(tournamentStandingsStreamProvider(tournamentId));
-        });
-        return true;
-      },
-    );
-  }
-
-  Future<bool> autoDistributeGroups({
-    required String tournamentId,
-    required List<String> groupNames,
-  }) async {
-    state = const AsyncLoading();
-    final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.autoDistributeGroups(
-      tournamentId: tournamentId,
-      groupNames: groupNames,
-    );
-    return result.fold(
-      (failure) {
-        _fail(failure);
-        return false;
-      },
-      (_) {
-        _ok();
-        _refresh(() {
-          ref.invalidate(tournamentRegistrationsProvider(tournamentId));
-          ref.invalidate(tournamentStandingsStreamProvider(tournamentId));
-        });
-        return true;
-      },
-    );
-  }
-
-  /// Returns the number of fixtures published, or null on failure.
-  Future<int?> generateAndPublishFixtures({
-    required String tournamentId,
-    required DrawPlan plan,
-    List<String> seedOrder = const [],
-  }) async {
-    state = const AsyncLoading();
-    final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.generateAndPublishFixtures(
-      tournamentId: tournamentId,
-      plan: plan,
-      seedOrder: seedOrder,
-    );
-    return result.fold(
-      (failure) {
-        _fail(failure);
-        return null;
-      },
-      (count) {
-        _ok();
-        _refresh(() {
-          ref.invalidate(tournamentDetailProvider(tournamentId));
-          ref.invalidate(tournamentFixturesProvider(tournamentId));
-          ref.invalidate(tournamentLiveBoardProvider(tournamentId));
-          ref.invalidate(myTournamentsProvider);
-        });
-        return count;
-      },
-    );
-  }
 
   Future<bool> confirmAwards(
     String tournamentId,

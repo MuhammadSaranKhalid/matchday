@@ -347,6 +347,89 @@ final class TournamentRegistrationsFamily extends $Family
   String toString() => r'tournamentRegistrationsProvider';
 }
 
+@ProviderFor(tournamentParticipants)
+final tournamentParticipantsProvider = TournamentParticipantsFamily._();
+
+final class TournamentParticipantsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<TournamentParticipant>>,
+          List<TournamentParticipant>,
+          FutureOr<List<TournamentParticipant>>
+        >
+    with
+        $FutureModifier<List<TournamentParticipant>>,
+        $FutureProvider<List<TournamentParticipant>> {
+  TournamentParticipantsProvider._({
+    required TournamentParticipantsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'tournamentParticipantsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$tournamentParticipantsHash();
+
+  @override
+  String toString() {
+    return r'tournamentParticipantsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<TournamentParticipant>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<TournamentParticipant>> create(Ref ref) {
+    final argument = this.argument as String;
+    return tournamentParticipants(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TournamentParticipantsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$tournamentParticipantsHash() =>
+    r'71e028b700cf5fdbad01f4d629aac2c9fb11edb3';
+
+final class TournamentParticipantsFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<TournamentParticipant>>,
+          String
+        > {
+  TournamentParticipantsFamily._()
+    : super(
+        retry: null,
+        name: r'tournamentParticipantsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  TournamentParticipantsProvider call(String tournamentId) =>
+      TournamentParticipantsProvider._(argument: tournamentId, from: this);
+
+  @override
+  String toString() => r'tournamentParticipantsProvider';
+}
+
 @ProviderFor(tournamentFixtures)
 final tournamentFixturesProvider = TournamentFixturesFamily._();
 

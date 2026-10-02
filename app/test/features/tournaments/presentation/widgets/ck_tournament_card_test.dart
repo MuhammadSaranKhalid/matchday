@@ -14,7 +14,6 @@ void main() {
       city: 'Lahore',
       maxTeams: 8,
       approvedTeamsCount: 8,
-      organizers: const ['user-1'],
       venues: const [TournamentVenue(name: 'Gaddafi Stadium')],
       createdAt: DateTime(2026, 8, 1),
       updatedAt: DateTime(2026, 8, 1),

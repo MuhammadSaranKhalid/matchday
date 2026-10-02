@@ -37,8 +37,8 @@ void main() {
       type: TournamentType.knockout,
       status: TournamentStatus.registration,
       privacy: TournamentPrivacy.public,
+      ownerUserId: 'org-user-1',
       createdBy: 'org-user-1',
-      organizers: const ['org-user-1'],
       venues: const [TournamentVenue(name: 'Model Town Ground', city: 'Lahore')],
       city: 'Lahore',
       entryFee: 15000,
@@ -58,7 +58,7 @@ void main() {
             teamName: 'Applicant $i',
             status: TournamentRegistrationStatus.pending,
             // Squad of 14: three named, then eleven more, two of them guests.
-            squad: [
+            squadProposal: [
               'Imran Yousaf',
               'Zeeshan Tariq',
               'Faraz Alam',
@@ -78,7 +78,6 @@ void main() {
     Widget harness(List<TournamentRegistration> regs) => ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider.overrideWith((ref) => Stream.value(user)),
             tournamentDetailProvider('t1')
                 .overrideWith((ref) => Future.value(tournament)),
             tournamentRegistrationsProvider('t1')

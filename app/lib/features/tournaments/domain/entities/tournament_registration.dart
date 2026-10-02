@@ -25,13 +25,10 @@ class TournamentRegistration {
     required this.teamId,
     required this.registeredAt,
     required this.status,
-    required this.squad,
+    this.squadProposal = const [],
     required this.createdAt,
     required this.updatedAt,
     this.registeredBy,
-    this.seedNumber,
-    this.groupId,
-    this.paymentStatus,
     this.decidedBy,
     this.decidedAt,
     this.decisionReason,
@@ -50,16 +47,16 @@ class TournamentRegistration {
   final String? registeredBy;
   final DateTime registeredAt;
   final TournamentRegistrationStatus status;
-  final List<String> squad;
-  final int? seedNumber;
-  final String? groupId;
-  final String? paymentStatus;
+  final List<String> squadProposal;
+
+  /// Convenience getter for submitted squad proposal.
+  List<String> get squad => squadProposal;
+
   final String? decidedBy;
   final DateTime? decidedAt;
 
   /// Why the organiser declined, in their own words. Distinct from [message],
-  /// which is the note the *manager* submitted with the application — showing
-  /// that one back as the decline reason is what this field replaced.
+  /// which is the note the *manager* submitted with the application.
   final String? decisionReason;
 
   final String? message;
@@ -76,10 +73,6 @@ class TournamentRegistration {
 
   bool get isApproved => status == TournamentRegistrationStatus.approved;
   bool get isPending => status == TournamentRegistrationStatus.pending;
-  bool get isPaid =>
-      paymentStatus != null &&
-      paymentStatus!.toLowerCase().contains('paid') &&
-      !paymentStatus!.toLowerCase().contains('unpaid');
 
   @override
   bool operator ==(Object other) =>
@@ -89,8 +82,6 @@ class TournamentRegistration {
           other.tournamentId == tournamentId &&
           other.teamId == teamId &&
           other.status == status &&
-          other.seedNumber == seedNumber &&
-          other.paymentStatus == paymentStatus &&
           other.decisionReason == decisionReason &&
           other.message == message;
 
@@ -100,8 +91,7 @@ class TournamentRegistration {
         tournamentId,
         teamId,
         status,
-        seedNumber,
-        paymentStatus,
         decisionReason,
+        message,
       );
 }

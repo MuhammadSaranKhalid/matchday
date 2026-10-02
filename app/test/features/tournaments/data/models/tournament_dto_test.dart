@@ -12,7 +12,6 @@ void main() {
         'status': 'registration',
         'privacy': 'public',
         'created_by': 'user-1',
-        'organizers': ['user-1'],
         'venues': [
           {'name': 'Model Town Ground', 'city': 'Lahore'}
         ],

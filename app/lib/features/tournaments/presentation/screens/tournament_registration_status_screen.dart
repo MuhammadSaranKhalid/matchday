@@ -335,9 +335,9 @@ class _TournamentRegistrationStatusScreenState
                                       border: Border.all(color: const Color(0xFFDED0AC)),
                                     ),
                                     child: Text(
-                                      reg.isPaid
-                                          ? 'FEE CONFIRMED · PKR ${_money.format(tournament.entryFee)}'
-                                          : 'PENDING PAYMENT · PKR ${_money.format(tournament.entryFee)}',
+                                      reg.isApproved
+                                          ? 'ENTRY APPROVED · PKR ${_money.format(tournament.entryFee)}'
+                                          : 'APPLICATION PENDING · PKR ${_money.format(tournament.entryFee)}',
                                       style: CkType.mono(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w700,
@@ -366,15 +366,16 @@ class _TournamentRegistrationStatusScreenState
 
                     const SizedBox(height: 20),
 
-                    // Quick action buttons
-                    Container(
-                      decoration: BoxDecoration(
-                        color: CkColors.paper,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: CkColors.hairline),
-                      ),
+                    Material(
+                      color: CkColors.paper,
+                      borderRadius: BorderRadius.circular(14),
                       clipBehavior: Clip.antiAlias,
-                      child: Column(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: CkColors.hairline),
+                        ),
+                        child: Column(
                         children: [
                           ListTile(
                             title: Text(
@@ -405,6 +406,7 @@ class _TournamentRegistrationStatusScreenState
                           ],
                         ],
                       ),
+                     ),
                     ),
                   ],
                 ),
@@ -518,7 +520,7 @@ class _TournamentRegistrationStatusScreenState
           Wrap(
             spacing: 8,
             children: [
-              if (reg.isPaid)
+              if (reg.isApproved)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
@@ -526,7 +528,7 @@ class _TournamentRegistrationStatusScreenState
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'FEE RECEIVED · CASH',
+                    'APPLICATION APPROVED',
                     style: CkType.mono(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w700,
@@ -534,23 +536,7 @@ class _TournamentRegistrationStatusScreenState
                     ),
                   ),
                 ),
-              if (reg.seedNumber != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F0E9),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: CkColors.hairline),
-                  ),
-                  child: Text(
-                    'SEED ${reg.seedNumber} OF ${t.maxTeams ?? 8}',
-                    style: CkType.mono(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                      color: CkColors.ink2,
-                    ),
-                  ),
-                ),
+
             ],
           ),
           const SizedBox(height: 14),

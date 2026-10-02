@@ -4,7 +4,6 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../matches/domain/entities/match.dart';
-import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/my_tournament_entry.dart';
 import '../../domain/entities/scorer_candidate.dart';
@@ -18,6 +17,7 @@ import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_organizer.dart';
 import '../../domain/ops/revised_target.dart';
 import '../../domain/entities/tournament_live_match.dart';
+import '../../domain/entities/tournament_participant.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/entities/tournament_squad_member.dart';
 import '../../domain/entities/tournament_standing.dart';
@@ -167,6 +167,19 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
+  Future<Either<Failure, List<TournamentParticipant>>>
+      getTournamentParticipants(String tournamentId) async {
+    try {
+      final dtos = await _remote.getTournamentParticipants(tournamentId);
+      return Right(dtos.map((d) => d.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, TournamentRegistration>> registerTeam({
     required String tournamentId,
     required String teamId,
@@ -242,11 +255,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     }
   }
 
-  @override
-  Future<Either<Failure, void>> withdrawRegistration(
-      String registrationId) async {
-    return withdrawPendingRegistration(registrationId);
-  }
+
 
   @override
   Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(
@@ -326,50 +335,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
 
-  @override
-  Future<Either<Failure, void>> assignTeamGroup({
-    required String registrationId,
-    required String? groupId,
-  }) async {
-    try {
-      await _remote.assignTeamGroup(registrationId, groupId);
-      return const Right(null);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
 
-  @override
-  Future<Either<Failure, void>> assignMultipleTeamsGroup({
-    required List<String> registrationIds,
-    required String? groupId,
-  }) async {
-    try {
-      await _remote.assignMultipleTeamsGroup(registrationIds, groupId);
-      return const Right(null);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, void>> autoDistributeGroups({
-    required String tournamentId,
-    required List<String> groupNames,
-  }) async {
-    try {
-      await _remote.autoDistributeGroups(tournamentId, groupNames);
-      return const Right(null);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
 
   @override
   Future<Either<Failure, List<Match>>> getTournamentFixtures(
@@ -410,36 +376,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     });
   }
 
-  @override
-  Future<Either<Failure, int>> generateAndPublishFixtures({
-    required String tournamentId,
-    required DrawPlan plan,
-    List<String> seedOrder = const [],
-  }) async {
-    // A type with no generator reaches here as an empty plan carrying its
-    // reason; say the reason rather than "no fixtures to publish".
-    final unsupported = plan.unsupported;
-    if (unsupported != null) {
-      return Left(
-        ValidationFailure('$unsupported draws are not supported yet.'),
-      );
-    }
-    if (plan.isEmpty) {
-      return const Left(ValidationFailure('There are no fixtures to publish.'));
-    }
-    try {
-      final count = await _remote.generateAndPublishFixtures(
-        tournamentId: tournamentId,
-        plan: plan,
-        seedOrder: seedOrder,
-      );
-      return Right(count);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+
 
   @override
   Future<Either<Failure, TournamentAwards>> getSuggestedAwards(

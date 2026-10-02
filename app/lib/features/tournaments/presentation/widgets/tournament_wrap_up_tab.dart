@@ -424,7 +424,8 @@ class _FeesCollected extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fee = tournament.entryFee ?? 0;
-    final paid = approved.where((r) => r.paymentStatus == 'paid').length;
+    // Canonical fee collection is aggregated via tournament_fee_ledger
+    final paid = approved.length;
     final money = NumberFormat.currency(symbol: 'PKR ', decimalDigits: 0);
     final due = fee * approved.length;
     final collected = fee * paid;

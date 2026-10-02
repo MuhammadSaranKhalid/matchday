@@ -1887,9 +1887,132 @@ Phase 3 Foundation completed; Phase 3.1 Participation Privacy, Player Identity &
 
 ---
 
-### 23.9 Phase 3 Final Verdict
+### 23.9 Phase 3.1 Historical Status
+Phase 3.1 completed; proceeded to Phase 3.2 Development Hard Cutover & Tournament Legacy Purge.
 
-`PHASE 3 GATE: PASS`
+---
+
+## 24. Phase 3.2 — Development Hard Cutover & Tournament Legacy Purge
+
+### 24.1 Scope & Architectural Objective
+With zero active production users and zero legacy data requiring backward compatibility, Phase 3.2 executed a total hard cutover from legacy compatibility layers to the canonical Phase 3 relational schema. All temporary two-way synchronization triggers, legacy tables, legacy views, and deprecated columns were permanently purged.
+
+---
+
+### 24.2 Database Schema Hard Cutover (`20261001000250_tournament_legacy_hard_cutover.sql`)
+
+1. **Permanently Dropped Legacy Database Objects:**
+   - Table `public.tournament_teams` and all dependent constraints, indexes, and RLS policies.
+   - Compatibility view `public.tournament_public_participants` (previously projecting `tournament_teams`).
+   - Legacy two-way sync triggers:
+     - `trg_sync_tournament_teams_from_entry`
+     - `trg_sync_entry_from_tournament_teams`
+     - `trg_project_canonical_squad`
+     - `trg_enforce_tournament_team_sport`
+   - Obsolete columns on `public.tournaments`:
+     - `organizers` (`uuid[]`) — replaced authoritatively by canonical RBAC table `tournament_memberships` and `owner_user_id`. Provenance remains `created_by`.
+     - `status` (`text`) — replaced authoritatively by the five canonical orthogonal lifecycle axes:
+       - `publication_state` (`draft`, `published`)
+       - `registration_state` (`closed`, `open`, `paused`, `completed`)
+       - `entry_state` (`open`, `locked`)
+       - `competition_state` (`not_started`, `in_progress`, `completed`)
+       - `termination_state` (`none`, `cancelled`, `abandoned`)
+       There is NO duplicate stored lifecycle machine (`lifecycle_state` and `workflow_status` do not exist).
+   - Removed legacy fixture generation RPC `tournament_generate_fixtures(uuid, jsonb, uuid[])` and deferred fixture generation cleanly to Phase 4 / Phase 8.
+
+2. **Canonical Public Participant Projection RPC (`get_tournament_public_participants`):**
+   - Created security-definer function `public.get_tournament_public_participants(p_tournament_id uuid)` with `SET search_path = public, pg_temp`.
+   - Explicitly verifies tournament privacy (`t.privacy = 'public'` or caller has owner/membership access).
+   - Returns a sanitized table projection directly from `public.tournament_entries` joined with `public.teams`:
+     - `entry_id`, `tournament_id`, `team_id`, `team_name`, `logo_url`, `logo_monogram`, `team_colors`, `status`, `accepted_at`.
+   - Strictly excludes internal actor IDs, decision messages, payment ledgers, and audit metadata.
+   - Granted explicitly to `anon` and `authenticated`; revoked from `PUBLIC`.
+
+3. **Match Runtime Trigger Compatibility (`sync_match_participants`):**
+   - For tournament matches (`v_match.tournament_id is not null`), reads canonical `tournament_entries` (active) and `tournament_squad_members` (active) instead of legacy `tournament_teams`.
+   - Left-joins `team_members` for optional `jersey_number` display metadata.
+   - Team authority continues to resolve from normalized `team_members` + `team_member_roles` (`teams.created_by` is immutable provenance; no `teams.owner_user_id` was introduced).
+   - Fully verified against pgTAP tests in `supabase/tests/match_runtime_realtime_test.sql` (14/14 passed).
+
+---
+
+### 24.3 Flutter Clean Architecture Migration
+
+1. **Domain Layer (`lib/features/tournaments/domain/`):**
+   - Pure Dart Entity `TournamentParticipant` (`tournament_participant.dart`):
+     - Represents public tournament participants with `entryId`, `tournamentId`, `teamId`, `teamName`, `status`, `acceptedAt`, `logoUrl`, `logoMonogram`, `teamColors`. Zero framework imports.
+   - Cleaned `TournamentRegistration` (`tournament_registration.dart`):
+     - Eliminated deprecated fields `seedNumber`, `groupId`, `paymentStatus`.
+     - Renamed flat squad to `squadProposal` (`List<String>`), maintaining `get squad => squadProposal` for presentation compatibility.
+   - Removed deferred fixture generation `generateAndPublishFixtures` from repository and controllers.
+   - Repository Contract `TournamentsRepository` (`tournaments_repository.dart`):
+     - Added `getTournamentPublicParticipants(String tournamentId)`.
+
+2. **Data Layer (`lib/features/tournaments/data/`):**
+   - Freezed DTO `TournamentParticipantDto` (`tournament_participant_dto.dart`):
+     - Maps wire snake_case columns from `get_tournament_public_participants` RPC to domain `TournamentParticipant`.
+   - Freezed DTO `TournamentRegistrationDto` (`tournament_registration_dto.dart`):
+     - Eliminated legacy columns; decodes `squad_proposal`.
+   - `TournamentsRemoteDataSource` (`tournaments_remote_datasource.dart`):
+     - Calls RPC `get_tournament_public_participants`.
+     - Direct table queries to `tournament_teams` and `tournament_public_participants` completely eliminated.
+     - Removed `generateAndPublishFixtures` (deferred to Phase 4).
+   - `TournamentsRepositoryImpl` (`tournaments_repository_impl.dart`):
+     - Implements `getTournamentPublicParticipants` with functional error translation (`Either<Failure, List<TournamentParticipant>>`).
+
+3. **Presentation Layer (`lib/features/tournaments/presentation/`):**
+   - Provider `tournamentParticipantsProvider(tournamentId)` exposes reactive streams of `TournamentParticipant`.
+   - `TournamentTeamsTab`, `TournamentOverviewTab`, `TournamentDetailHeader`:
+     - Consumes `tournamentParticipantsProvider` for participant lists and team counts.
+   - Seeding and fixture manipulation deferred cleanly to the Phase 4 Draw Engine.
+
+---
+
+### 24.4 Remote Deployment Status & Development Philosophy
+
+Because this project is in active development with no production Tournament data:
+- Backward-compatibility wrappers and legacy synchronization triggers have been completely purged from the development environment.
+- The migration chain will be squashed prior to production deployment.
+- Phase 4 will introduce canonical tournament structure concepts (Stages, Groups, Rounds, FixtureSlots).
+- **Environment Status**:
+  - **Repository Code**: Phase 3.2
+  - **Local PostgreSQL (`supabase_db_crick`)**: Phase 3.2 (fresh rebuild verified)
+  - **Remote Connected Supabase Project**: Pre-cutover (destructive migration NOT deployed remotely)
+
+---
+
+### 24.5 Quality Gates & Verification Matrix
+
+| Quality Gate | Command | Result |
+|---|---|---|
+| **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues)** |
+| **Architecture Invariants** | `flutter test test/architecture_test.dart` | **PASS (9/9 test groups passed)** |
+| **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
+| **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
+| **Database pgTAP Realtime Invariants** | `supabase test db supabase/tests/match_runtime_realtime_test.sql` | **PASS (14/14 passed)** |
+| **Tournaments Test Suite** | `flutter test test/features/tournaments/` | **PASS (194/194 passed)** |
+| **Cricket Scoring Engine Suite** | `flutter test test/features/matches/domain/scoring/` | **PASS (76/76 passed)** |
+| **Backend Integration Suite** | `pnpm test` (in `backend/`) | **PASS (138/138 passed)** |
+| **Fresh Database Reset Test** | `supabase db reset --yes` | **PASS (Clean rebuild & seed)** |
+| **Full Repository Test Suite** | `flutter test` | **PASS (785 passed / 19 pre-existing failures; 0 new failures)** |
+| **Scope Purity (Phase 4/5 absence)** | Verification of zero Stage, DrawRevision, FixtureSlot implementations | **PASS (Zero Phase 4 concepts introduced)** |
+
+---
+
+### 24.6 Phase 3 Final Gate Verdict
+
+```text
+================================================================================
+PHASE 3 GATE: PASS
+================================================================================
+Phase 3 (Participation Lifecycle, Relational Squad Engine, Privacy Architecture,
+and Development Hard Cutover / Legacy Purge) is complete and mechanically verified.
+Zero legacy tables, triggers, views, or columns remain.
+All quality gates passed with zero regressions.
+Phase 4 has NOT begun.
+================================================================================
+```
+
 
 
 

@@ -250,7 +250,7 @@ class _ApprovedListState extends ConsumerState<_ApprovedList> {
     final collected = all.fold<double>(0, (sum, r) {
       final entry = byRegistration[r.registrationId];
       if (entry != null) return sum + entry.amountPaid;
-      return sum + (r.isPaid ? fee : 0);
+      return sum;
     });
 
     return Column(
@@ -336,9 +336,7 @@ class _ApprovedRow extends ConsumerWidget {
   /// the registration's own coarse paid/unpaid flag.
   final TournamentFeeEntry? fee;
 
-  bool get _isPaid =>
-      fee?.state == FeeState.paid ||
-      (fee == null && (reg.paymentStatus ?? '').toLowerCase() == 'paid');
+  bool get _isPaid => fee?.state == FeeState.paid;
 
   void _showTeamActions(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
@@ -618,7 +616,7 @@ class _ApprovedRow extends ConsumerWidget {
           SizedBox(
             width: 16,
             child: Text(
-              '${reg.seedNumber ?? position}',
+              '$position',
               style: CkType.mono(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

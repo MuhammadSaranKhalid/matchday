@@ -81,14 +81,7 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
 
   List<TournamentRegistration> _initialOrder() {
     final list = [...widget.approved];
-    list.sort((a, b) {
-      final sa = a.seedNumber;
-      final sb = b.seedNumber;
-      if (sa != null && sb != null) return sa.compareTo(sb);
-      if (sa != null) return -1;
-      if (sb != null) return 1;
-      return a.registeredAt.compareTo(b.registeredAt);
-    });
+    list.sort((a, b) => a.registeredAt.compareTo(b.registeredAt));
     return list;
   }
 
@@ -317,10 +310,29 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
         const SizedBox(height: 8),
         _GroundSlotMatrix(fixtures: plan.fixtures),
         const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CkColors.paper2,
+            borderRadius: BorderRadius.circular(CkRadii.md),
+            border: Border.all(color: CkColors.line),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: CkColors.muted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Seeding and draw lock are deferred to Phase 4 Draw Engine',
+                  style: CkType.body(fontSize: 12, color: CkColors.muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         ElevatedButton(
-          onPressed: widget.onLock == null
-              ? null
-              : () => widget.onLock!(_ordered, plan),
+          onPressed: null,
           style: ElevatedButton.styleFrom(
             backgroundColor: CkColors.ink,
             disabledBackgroundColor: CkColors.paper2,
@@ -336,7 +348,7 @@ class _TournamentSeedingTabState extends State<TournamentSeedingTab> {
             style: CkType.body(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: CkColors.paper,
+              color: CkColors.muted,
             ),
           ),
         ),

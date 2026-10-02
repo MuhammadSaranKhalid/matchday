@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_current_user_id_provider.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_fee_entry.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_live_match.dart';
@@ -40,7 +40,7 @@ void main() {
       status: TournamentStatus.registration,
       privacy: TournamentPrivacy.public,
       createdBy: 'org-user-1',
-      organizers: const ['org-user-1'],
+      ownerUserId: 'org-user-1',
       venues: const [TournamentVenue(name: 'Gaddafi Stadium', city: 'Lahore')],
       city: 'Lahore',
       startDate: DateTime(2026, 9, 1),
@@ -59,11 +59,10 @@ void main() {
         teamId: 'team-1',
         teamName: 'Lahore Lions',
         status: TournamentRegistrationStatus.pending,
-        squad: const ['p1', 'p2', 'p3'],
+        squadProposal: const ['p1', 'p2', 'p3'],
         registeredBy: 'mgr-1',
         registeredByName: 'Captain Ali',
         message: 'Looking forward to participating!',
-        paymentStatus: 'UNPAID',
         registeredAt: DateTime.now(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -74,12 +73,9 @@ void main() {
         teamId: 'team-2',
         teamName: 'Karachi Kings Club',
         status: TournamentRegistrationStatus.approved,
-        seedNumber: 1,
-        groupId: 'Group A',
-        squad: const ['p4', 'p5', 'p6'],
+        squadProposal: const ['p4', 'p5', 'p6'],
         registeredBy: 'mgr-2',
         registeredByName: 'Coach Khan',
-        paymentStatus: 'PAID',
         registeredAt: DateTime.now(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -92,8 +88,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -142,8 +136,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -180,8 +172,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -218,7 +208,7 @@ void main() {
         status: TournamentStatus.registration,
         privacy: TournamentPrivacy.public,
         createdBy: 'org-user-1',
-        organizers: const ['org-user-1'],
+        ownerUserId: 'org-user-1',
         venues: const [],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -228,8 +218,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(league)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -251,8 +239,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -278,8 +264,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -308,7 +292,7 @@ void main() {
     testWidgets('the seeding tab explains the draw and gates the lock',
         (tester) async {
       // Four approved teams so the draw is available.
-      final approved = [
+      final approved = <TournamentRegistration>[
         for (var i = 0; i < 4; i++)
           TournamentRegistration(
             registrationId: 'reg-$i',
@@ -316,9 +300,8 @@ void main() {
             teamId: 'team-$i',
             teamName: 'Team $i',
             status: TournamentRegistrationStatus.approved,
-            squad: const ['p1', 'p2'],
+            squadProposal: const ['p1', 'p2'],
             registeredBy: 'mgr-$i',
-            paymentStatus: 'PAID',
             registeredAt: DateTime(2026, 8, i + 1),
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -329,8 +312,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -374,22 +355,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(lockButton, findsOneWidget);
-
-      await tester.tap(lockButton);
-      await tester.pumpAndSettle();
-
-      // Artboard 26: a checkbox gates the confirm, and the confirm is ink.
-      expect(find.text('CANNOT BE UNDONE'), findsOneWidget);
-      expect(find.text('Lock the draw and publish fixtures?'), findsOneWidget);
-
-      final confirm = find.widgetWithText(ElevatedButton, 'Lock & Publish');
-      expect(tester.widget<ElevatedButton>(confirm).onPressed, isNull);
-
-      await tester.tap(
-        find.textContaining('I have checked the seeds'),
-      );
-      await tester.pumpAndSettle();
-      expect(tester.widget<ElevatedButton>(confirm).onPressed, isNotNull);
+      expect(find.textContaining('deferred to Phase 4'), findsOneWidget);
     });
 
     // ─── Live Ops (artboard 27) ──────────────────────────────────────────────
@@ -442,8 +408,6 @@ void main() {
     Widget console({List<TournamentLiveMatch>? board}) => ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -682,7 +646,7 @@ void main() {
         status: TournamentStatus.cancelled,
         privacy: TournamentPrivacy.public,
         createdBy: 'org-user-1',
-        organizers: const ['org-user-1'],
+        ownerUserId: 'org-user-1',
         venues: const [],
         rules: const {
           'cancelled_reason': 'Ground flooded, no replacement venue.',
@@ -696,8 +660,6 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(cancelled)),
             tournamentRegistrationsProvider('tourn-console-1')
@@ -735,7 +697,7 @@ void main() {
         status: TournamentStatus.registration,
         privacy: TournamentPrivacy.public,
         createdBy: 'org-user-1', // creator is org-user-1, not co-org-user-99
-        organizers: const ['org-user-1', 'co-org-user-99'],
+        ownerUserId: 'org-user-1',
         venues: const [TournamentVenue(name: 'Gaddafi Stadium', city: 'Lahore')],
         city: 'Lahore',
         createdAt: DateTime.now(),
@@ -746,8 +708,7 @@ void main() {
         ProviderScope(
           overrides: [
             tournamentsRepositoryProvider.overrideWithValue(repo),
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(coOrgUser)),
+            currentUserIdProvider.overrideWithValue('co-org-user-99'),
             tournamentDetailProvider('tourn-console-1')
                 .overrideWith((ref) => Future.value(tournamentWithCoOrg)),
             tournamentRegistrationsProvider('tourn-console-1')

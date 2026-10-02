@@ -242,7 +242,7 @@ function searchTournaments(sql: any, q: string, limit: number) {
       tr.tournament_id,
       tr.tournament_name,
       tr.tournament_type::text as tournament_type,
-      tr.status::text as status,
+      public.derive_tournament_public_status(tr.publication_state, tr.registration_state, tr.entry_state, tr.competition_state, tr.termination_state)::text as status,
       tr.banner_image_url,
       tr.logo_url,
       tr.start_date,
@@ -250,13 +250,13 @@ function searchTournaments(sql: any, q: string, limit: number) {
       tr.location,
       tr.entry_fee,
       tr.max_teams,
-      (select count(*)::int from public.tournament_teams tt where tt.tournament_id = tr.tournament_id and tt.status = 'approved') as approved_teams_count,
+      (select count(*)::int from public.tournament_entries te where te.tournament_id = tr.tournament_id and te.status = 'active') as approved_teams_count,
       coalesce(word_similarity(${q}, tr.tournament_name), 0)::float8 as score
     from public.tournaments tr
     where tr.privacy = 'public'
-      and tr.status <> 'draft'
+      and tr.publication_state = 'published'
       and (tr.tournament_name like ${q} || '%' or ${q} <% tr.tournament_name)
-    order by (tr.status = 'live') desc, (tr.status = 'registration') desc, score desc, tr.start_date desc nulls last, tr.tournament_id asc
+    order by (tr.competition_state = 'in_progress') desc, (tr.registration_state = 'open') desc, score desc, tr.start_date desc nulls last, tr.tournament_id asc
     limit ${limit}`;
 }
 
@@ -325,7 +325,7 @@ async function browse(sql: any, actor: string) {
         tr.tournament_id,
         tr.tournament_name,
         tr.tournament_type::text as tournament_type,
-        tr.status::text as status,
+        public.derive_tournament_public_status(tr.publication_state, tr.registration_state, tr.entry_state, tr.competition_state, tr.termination_state)::text as status,
         tr.banner_image_url,
         tr.logo_url,
         tr.start_date,
@@ -333,12 +333,13 @@ async function browse(sql: any, actor: string) {
         tr.location,
         tr.entry_fee,
         tr.max_teams,
-        (select count(*)::int from public.tournament_teams tt where tt.tournament_id = tr.tournament_id and tt.status = 'approved') as approved_teams_count,
+        (select count(*)::int from public.tournament_entries te where te.tournament_id = tr.tournament_id and te.status = 'active') as approved_teams_count,
         0::float8 as score
       from public.tournaments tr
       where tr.privacy = 'public'
-        and tr.status in ('registration', 'upcoming', 'live')
-      order by (tr.status = 'live') desc, (tr.status = 'registration') desc, tr.start_date desc nulls last, tr.tournament_id asc
+        and tr.publication_state = 'published'
+        and (tr.competition_state = 'in_progress' or tr.registration_state = 'open' or tr.competition_state = 'not_started')
+      order by (tr.competition_state = 'in_progress') desc, (tr.registration_state = 'open') desc, tr.start_date desc nulls last, tr.tournament_id asc
       limit 10`,
   ]);
 

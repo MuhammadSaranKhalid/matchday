@@ -44,7 +44,7 @@ class TournamentResult extends Equatable {
   final int? maxTeams;
 
   /// Approved registrations only — the function filters on
-  /// `tournament_teams.status = 'approved'`, so this is the number of teams
+  /// `tournament_entries.status = 'active'`, so this is the number of teams
   /// actually in the cup, not the number who applied.
   final int approvedTeamsCount;
 

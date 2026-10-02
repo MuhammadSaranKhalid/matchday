@@ -24,8 +24,8 @@ void main() {
         type: TournamentType.knockout,
         status: TournamentStatus.registration,
         privacy: TournamentPrivacy.public,
+        ownerUserId: 'user-1',
         createdBy: 'user-1',
-        organizers: const ['user-1'],
         venues: const [TournamentVenue(name: 'Gaddafi Stadium', city: 'Lahore')],
         city: 'Lahore',
         startDate: DateTime(2026, 9, 1),
@@ -41,8 +41,8 @@ void main() {
         type: TournamentType.roundRobin,
         status: TournamentStatus.live,
         privacy: TournamentPrivacy.public,
+        ownerUserId: 'user-2',
         createdBy: 'user-2',
-        organizers: const ['user-2'],
         venues: const [TournamentVenue(name: 'Diamond Ground', city: 'Islamabad')],
         city: 'Islamabad',
         startDate: DateTime(2026, 8, 25),
@@ -164,9 +164,8 @@ void main() {
           teamId: 'team-1',
           teamName: 'Lahore Lions',
           status: TournamentRegistrationStatus.approved,
-          squad: const ['p1', 'p2', 'p3'],
+          squadProposal: const ['p1', 'p2', 'p3'],
           registeredBy: 'user-1',
-          paymentStatus: 'paid',
           registeredAt: DateTime.now().subtract(const Duration(days: 2)),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -183,7 +182,7 @@ void main() {
       expect(find.text('CURRENTLY PLAYING'), findsOneWidget);
       expect(find.text('Playing as Lahore Lions'), findsOneWidget);
       expect(find.text('Squad confirmed · 3'), findsOneWidget);
-      expect(find.text('Fee paid'), findsOneWidget);
+      expect(find.text('Accepted'), findsOneWidget);
       expect(find.text('Manage Console'), findsNothing);
     });
   });

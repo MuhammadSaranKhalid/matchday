@@ -15,7 +15,6 @@ void main() {
         privacy: TournamentPrivacy.public,
         createdBy: 'user-original-creator',
         ownerUserId: 'user-current-owner',
-        organizers: const ['user-original-creator'],
         venues: const [],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 6, 1),
@@ -160,7 +159,6 @@ void main() {
         entryState: TournamentEntryState.locked,
         competitionState: TournamentCompetitionState.inProgress,
         terminationState: TournamentTerminationState.none,
-        organizers: const [],
         venues: const [],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
@@ -307,7 +305,6 @@ void main() {
         privacy: TournamentPrivacy.public,
         ownerUserId: 'user-canonical-owner',
         createdBy: 'user-historical-creator',
-        organizers: const ['user-legacy-organizer-1', 'user-legacy-organizer-2'],
         venues: const [],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
@@ -320,9 +317,6 @@ void main() {
       // Historical provenance is preserved via dedicated helper
       expect(tournament.wasCreatedBy('user-historical-creator'), isTrue);
       expect(tournament.wasCreatedBy('user-canonical-owner'), isFalse);
-      // Legacy organizers array members maintain transitional access
-      expect(tournament.isOrganizedBy('user-legacy-organizer-1'), isTrue);
-      expect(tournament.isOrganizedBy('user-legacy-organizer-2'), isTrue);
       // Unrelated user is rejected
       expect(tournament.isOrganizedBy('user-stranger'), isFalse);
     });
@@ -337,7 +331,6 @@ void main() {
         privacy: TournamentPrivacy.public,
         createdBy: 'user-a',
         ownerUserId: 'user-a',
-        organizers: const [],
         venues: const [],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
@@ -355,7 +348,6 @@ void main() {
         privacy: initialTournament.privacy,
         createdBy: initialTournament.createdBy, // createdBy remains user-a (immutable provenance)
         ownerUserId: 'user-b', // transferred ownership
-        organizers: initialTournament.organizers,
         venues: initialTournament.venues,
         createdAt: initialTournament.createdAt,
         updatedAt: DateTime(2026, 6, 1),

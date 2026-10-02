@@ -160,7 +160,6 @@ class Tournament {
     required this.type,
     required this.status,
     required this.privacy,
-    required this.organizers,
     required this.venues,
     required this.createdAt,
     required this.updatedAt,
@@ -206,7 +205,6 @@ class Tournament {
   final TournamentEntryState entryState;
   final TournamentCompetitionState competitionState;
   final TournamentTerminationState terminationState;
-  final List<String> organizers;
   final List<TournamentVenue> venues;
   final String? bannerImageUrl;
   final String? logoUrl;
@@ -269,12 +267,14 @@ class Tournament {
 
   /// Authority check: answers whether [userId] currently has root owner
   /// or delegated organizer authority over this tournament.
+  /// Authority check: answers whether [userId] currently has root owner
+  /// authority over this tournament. Delegated organizer authority is resolved
+  /// via [tournament_memberships].
   ///
   /// Provenance ([createdBy]) answers who originated the row and does NOT
   /// grant present authority once [ownerUserId] is set.
   bool isOrganizedBy(String userId) =>
-      (ownerUserId != null ? ownerUserId == userId : createdBy == userId) ||
-      organizers.contains(userId);
+      ownerUserId != null ? ownerUserId == userId : createdBy == userId;
 
   /// Provenance helper: answers who originated this tournament row.
   /// Does NOT grant current authorization.

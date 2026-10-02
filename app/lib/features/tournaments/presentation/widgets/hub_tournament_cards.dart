@@ -518,16 +518,14 @@ class HubPlayingBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
-    final textTheme = context.textTheme;
     final reg = entry.registration;
-    final paid = (reg.paymentStatus ?? '').toLowerCase() == 'paid';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Playing as ${reg.teamName ?? 'your team'}',
-          style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
+          style: (context.textTheme.titleSmall ?? const TextStyle()).copyWith(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: scheme.onSurface,
@@ -544,10 +542,10 @@ class HubPlayingBody extends StatelessWidget {
                   : 'Squad of ${reg.squad.length} submitted',
               good: reg.isApproved,
             ),
-            if (paid)
-              const HubNeutralChip(label: 'Fee paid', good: true)
+            if (reg.isApproved)
+              const HubNeutralChip(label: 'Accepted', good: true)
             else
-              const HubCreamChip(label: 'Pending payment'),
+              const HubCreamChip(label: 'Pending decision'),
           ],
         ),
       ],

@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/database/database_provider.dart';
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_current_user_id_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../data/datasources/tournaments_datasource_providers.dart';
 import '../../domain/entities/ground.dart';
@@ -533,9 +533,9 @@ class _TournamentCreateWizardScreenState
   Widget build(BuildContext context) {
     final busy = ref.watch(tournamentsControllerProvider).isLoading;
 
-    final user = ref.read(supabaseClientProvider).auth.currentUser;
-    if (user != null) {
-      final key = 'tournament_create:${user.id}';
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId != null) {
+      final key = 'tournament_create:$userId';
       if (key != _draftKey) _onUserResolved(key);
     }
 

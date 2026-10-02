@@ -626,14 +626,13 @@ class _TournamentRequestsScreenState
         if (index == shown.length) return _morePendingFooter(list, hidden);
         final reg = shown[index];
         final isExpanded = _expandedSquads.contains(reg.registrationId);
-        final hasFee = reg.isPaid;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top row: Avatar + Team Name & Manager info + Fee chip
+              // Top row: Avatar + Team Name & Manager info + Squad proposal chip
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -688,25 +687,19 @@ class _TournamentRequestsScreenState
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: hasFee
-                          ? const Color(0xFFCFEED2)
-                          : const Color(0xFFF3F0E9),
+                      color: const Color(0xFFF3F0E9),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: hasFee
-                            ? const Color(0xFFA9D9B2)
-                            : const Color(0xFFE6E2D9),
+                        color: const Color(0xFFE6E2D9),
                       ),
                     ),
                     child: Text(
-                      hasFee ? 'FEE READY' : 'NO FEE YET',
+                      '${reg.squadProposal.length} PLAYERS',
                       style: CkType.mono(
                         fontSize: 8.5,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.06,
-                        color: hasFee
-                            ? const Color(0xFF1E5A2C)
-                            : const Color(0xFF6E685E),
+                        color: const Color(0xFF6E685E),
                       ),
                     ),
                   ),

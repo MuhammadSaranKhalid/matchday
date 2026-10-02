@@ -3,7 +3,7 @@ import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 
 void main() {
   group('Tournament entity tests', () {
-    test('isOrganizedBy returns true for created_by and organizers list', () {
+    test('isOrganizedBy returns true for owner_user_id or created_by', () {
       final tournament = Tournament(
         id: 't-1',
         name: 'Lahore Cup',
@@ -11,15 +11,28 @@ void main() {
         status: TournamentStatus.registration,
         privacy: TournamentPrivacy.public,
         createdBy: 'user-1',
-        organizers: const ['user-1', 'user-2'],
+        ownerUserId: 'user-2',
         venues: const [TournamentVenue(name: 'Model Town Ground')],
         createdAt: DateTime(2026, 8, 1),
         updatedAt: DateTime(2026, 8, 1),
       );
 
-      expect(tournament.isOrganizedBy('user-1'), isTrue);
       expect(tournament.isOrganizedBy('user-2'), isTrue);
+      expect(tournament.isOrganizedBy('user-1'), isFalse);
       expect(tournament.isOrganizedBy('user-3'), isFalse);
+
+      final fallbackTournament = Tournament(
+        id: 't-2',
+        name: 'Karachi Cup',
+        type: TournamentType.knockout,
+        status: TournamentStatus.registration,
+        privacy: TournamentPrivacy.public,
+        createdBy: 'user-1',
+        venues: const [TournamentVenue(name: 'National Stadium')],
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 1),
+      );
+      expect(fallbackTournament.isOrganizedBy('user-1'), isTrue);
     });
 
     test('TournamentType parsing and labels', () {

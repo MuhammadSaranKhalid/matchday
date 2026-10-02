@@ -1,6 +1,6 @@
 import '../../domain/entities/tournament_registration.dart';
 
-/// Wire-format DTO for `public.tournament_teams` rows.
+/// Wire-format DTO for `public.tournament_registrations` rows.
 class TournamentRegistrationDto {
   const TournamentRegistrationDto({
     required this.registrationId,
@@ -8,13 +8,10 @@ class TournamentRegistrationDto {
     required this.teamId,
     required this.registeredAt,
     required this.status,
-    required this.squad,
+    this.squadProposal = const [],
     required this.createdAt,
     required this.updatedAt,
     this.registeredBy,
-    this.seedNumber,
-    this.groupId,
-    this.paymentStatus,
     this.decidedBy,
     this.decidedAt,
     this.decisionReason,
@@ -33,10 +30,7 @@ class TournamentRegistrationDto {
   final String? registeredBy;
   final String registeredAt;
   final String status;
-  final List<String> squad;
-  final int? seedNumber;
-  final String? groupId;
-  final String? paymentStatus;
+  final List<String> squadProposal;
   final String? decidedBy;
   final String? decidedAt;
   final String? decisionReason;
@@ -57,20 +51,17 @@ class TournamentRegistrationDto {
     final profileJson = json['profiles'] as Map<String, dynamic>?;
 
     return TournamentRegistrationDto(
-      registrationId: (json['registration_id'] ?? json['entry_id']) as String,
+      registrationId: json['registration_id'] as String,
       tournamentId: json['tournament_id'] as String,
       teamId: json['team_id'] as String,
       registeredBy: json['registered_by'] as String?,
       registeredAt: json['registered_at'] as String? ??
           DateTime.now().toIso8601String(),
       status: json['status'] as String? ?? 'pending',
-      squad: ((json['squad_proposal'] ?? json['squad']) as List<dynamic>?)
+      squadProposal: (json['squad_proposal'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      seedNumber: json['seed_number'] as int?,
-      groupId: json['group_id'] as String?,
-      paymentStatus: json['payment_status'] as String?,
       decidedBy: json['decided_by'] as String?,
       decidedAt: json['decided_at'] as String?,
       decisionReason: json['decision_reason'] as String?,
@@ -96,10 +87,7 @@ class TournamentRegistrationDto {
       registeredBy: registeredBy,
       registeredAt: DateTime.parse(registeredAt),
       status: TournamentRegistrationStatus.fromWire(status),
-      squad: squad,
-      seedNumber: seedNumber,
-      groupId: groupId,
-      paymentStatus: paymentStatus,
+      squadProposal: squadProposal,
       decidedBy: decidedBy,
       decidedAt: decidedAt != null ? DateTime.parse(decidedAt!) : null,
       decisionReason: decisionReason,

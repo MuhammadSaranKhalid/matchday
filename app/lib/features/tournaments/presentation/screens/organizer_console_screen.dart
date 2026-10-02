@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/supabase/supabase_client_provider.dart';
+import '../../../../core/supabase/supabase_current_user_id_provider.dart';
 import '../../../../core/theme/circk_theme.dart';
 import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/scorer_candidate.dart';
@@ -17,7 +17,6 @@ import '../controllers/tournaments_controller.dart';
 import '../providers/tournaments_providers.dart';
 import '../widgets/tournament_cancel_dialog.dart';
 import '../widgets/tournament_live_ops_tab.dart';
-import '../widgets/tournament_lock_dialog.dart';
 import '../widgets/tournament_ops_sheets.dart';
 import '../widgets/tournament_registrations_tab.dart';
 import '../widgets/tournament_seeding_tab.dart';
@@ -118,48 +117,14 @@ class _OrganizerConsoleScreenState
       return;
     }
 
-    final confirmed = await showLockDrawDialog(
-      context,
-      teamCount: ordered.length,
-      playerCount: ordered.fold<int>(0, (s, r) => s + r.squad.length),
-      hasWaitlist: false,
-      fixtureCount: plan.fixtures.length,
-      roundCount: plan.roundCount,
-      lastDate: plan.lastDate,
-    );
-    if (confirmed != true || !mounted) return;
-
-    final count = await ref
-        .read(tournamentsControllerProvider.notifier)
-        .generateAndPublishFixtures(
-          tournamentId: widget.tournamentId,
-          plan: plan,
-          // Position in this list becomes `seed_number`, written in the same
-          // transaction as the draw.
-          seedOrder: ordered.map((r) => r.teamId).toList(),
-        );
-
     if (!mounted) return;
-    if (count != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Draw locked · $count fixture${count == 1 ? '' : 's'} live',
-          ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Seeding and draw lock are deferred to Phase 4 Draw Engine',
         ),
-      );
-      _tabController.animateTo(2);
-    } else {
-      final state = ref.read(tournamentsControllerProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: CkColors.redInk,
-          content: Text(
-            state.hasError ? '${state.error}' : 'Could not lock the draw.',
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   // ─── Build ─────────────────────────────────────────────────────────────────
@@ -689,8 +654,8 @@ class _OrganizerConsoleScreenState
   // ─── The console ⋮ menu (artboard 27c, left) ───────────────────────────────
 
   Future<void> _onConsoleMenu(Tournament tournament) async {
-    final me = ref.read(supabaseClientProvider).auth.currentUser;
-    final isOwner = me != null && tournament.effectiveOwnerUserId == me.id;
+    final myId = ref.read(currentUserIdProvider);
+    final isOwner = myId != null && tournament.effectiveOwnerUserId == myId;
     final inRegistration = tournament.status == TournamentStatus.registration;
     final action = await showConsoleMenu(
       context,

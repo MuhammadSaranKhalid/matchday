@@ -286,13 +286,17 @@ export class AuthorizationRepository {
       select exists (
         select 1
         from public.tournaments t
-        where t.tournament_id =
-              ${match.tournamentId}::uuid
+        where t.tournament_id = ${match.tournamentId}::uuid
           and (
-            t.created_by =
-              ${actorId}::uuid
-            or ${actorId}::uuid =
-              any(t.organizers)
+            t.owner_user_id = ${actorId}::uuid
+            or exists (
+              select 1
+              from public.tournament_memberships tm
+              where tm.tournament_id = t.tournament_id
+                and tm.user_id = ${actorId}::uuid
+                and tm.status = 'active'
+                and tm.role_key in ('owner', 'manager')
+            )
           )
       ) as allowed
     `;

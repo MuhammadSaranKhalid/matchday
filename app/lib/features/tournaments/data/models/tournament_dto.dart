@@ -8,7 +8,6 @@ class TournamentDto {
     required this.tournamentType,
     required this.status,
     required this.privacy,
-    required this.organizers,
     required this.venues,
     required this.createdAt,
     required this.updatedAt,
@@ -49,7 +48,6 @@ class TournamentDto {
   final String entryState;
   final String competitionState;
   final String terminationState;
-  final List<String> organizers;
   final List<dynamic> venues;
   final String? bannerImageUrl;
   final String? logoUrl;
@@ -69,24 +67,27 @@ class TournamentDto {
   final String updatedAt;
 
   factory TournamentDto.fromJson(Map<String, dynamic> json) {
+    final rawStatus = json['status'] as String?;
+    final pub = json['publication_state'] as String? ?? 'draft';
+    final reg = json['registration_state'] as String? ?? 'not_open';
+    final comp = json['competition_state'] as String? ?? 'not_started';
+    final term = json['termination_state'] as String? ?? 'none';
+    final derivedStatus = rawStatus ?? _deriveStatus(pub, reg, comp, term);
+
     return TournamentDto(
       tournamentId: json['tournament_id'] as String,
       tournamentName: json['tournament_name'] as String? ?? 'Untitled Tournament',
       tournamentType: json['tournament_type'] as String? ?? 'knockout',
-      status: json['status'] as String? ?? 'draft',
+      status: derivedStatus,
       privacy: json['privacy'] as String? ?? 'public',
       ownerUserId: json['owner_user_id'] as String? ?? json['created_by'] as String?,
       createdBy: json['created_by'] as String?,
       revision: (json['revision'] as num?)?.toInt() ?? 1,
-      publicationState: json['publication_state'] as String? ?? 'draft',
-      registrationState: json['registration_state'] as String? ?? 'not_open',
+      publicationState: pub,
+      registrationState: reg,
       entryState: json['entry_state'] as String? ?? 'editable',
-      competitionState: json['competition_state'] as String? ?? 'not_started',
-      terminationState: json['termination_state'] as String? ?? 'none',
-      organizers: (json['organizers'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      competitionState: comp,
+      terminationState: term,
       venues: json['venues'] as List<dynamic>? ?? const [],
       bannerImageUrl: json['banner_image_url'] as String?,
       logoUrl: json['logo_url'] as String?,
@@ -105,6 +106,19 @@ class TournamentDto {
       createdAt: json['created_at'] as String? ?? DateTime.now().toIso8601String(),
       updatedAt: json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
     );
+  }
+
+  static String _deriveStatus(
+    String pub,
+    String reg,
+    String comp,
+    String term,
+  ) {
+    if (term == 'abandoned' || term == 'cancelled') return 'cancelled';
+    if (comp == 'in_progress' || comp == 'paused') return 'live';
+    if (comp == 'completed' || pub == 'archived') return 'completed';
+    if (reg == 'open' || pub == 'published') return 'upcoming';
+    return 'draft';
   }
 
   Tournament toEntity() {
@@ -131,7 +145,6 @@ class TournamentDto {
       entryState: TournamentEntryState.fromWire(entryState),
       competitionState: TournamentCompetitionState.fromWire(competitionState),
       terminationState: TournamentTerminationState.fromWire(terminationState),
-      organizers: organizers,
       venues: venueObjects,
       bannerImageUrl: bannerImageUrl,
       logoUrl: logoUrl,

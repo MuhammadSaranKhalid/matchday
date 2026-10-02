@@ -10,6 +10,7 @@ import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_organizer.dart';
+import '../../domain/entities/tournament_participant.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../providers/tournaments_providers.dart';
 import 'ck_pulse_dot.dart';
@@ -54,10 +55,12 @@ class _RegistrationOverview extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final organizer = ref.watch(tournamentOrganizerProvider(tournament.id)).value;
+    final participants =
+        ref.watch(tournamentParticipantsProvider(tournament.id)).value ??
+            const <TournamentParticipant>[];
     final regs =
         ref.watch(tournamentRegistrationsProvider(tournament.id)).value ??
             const <TournamentRegistration>[];
-    final approved = regs.where((r) => r.isApproved).toList();
     final memberships = ref.watch(currentUserTeamMembershipsProvider).value ??
         const <TeamMembership>[];
     final myReg = regs
@@ -75,7 +78,7 @@ class _RegistrationOverview extends ConsumerWidget {
       children: [
         if (organizer != null) _OrganizerRow(organizer: organizer),
         _WhenAndWhere(tournament: tournament),
-        _Scarcity(tournament: tournament, approved: approved),
+        _Scarcity(tournament: tournament, participants: participants),
         if (tournament.registrationDeadline case final deadline?)
           _DeadlineChip(deadline: deadline),
         if ((tournament.entryFee ?? 0) > 0) _FeeBlock(tournament: tournament),
@@ -265,15 +268,17 @@ class _WhenAndWhere extends StatelessWidget {
 /// "2 spots left · 6 / 8 teams", with the crests of who is already in — the
 /// second question a manager asks, answered with evidence rather than a count.
 class _Scarcity extends StatelessWidget {
-  const _Scarcity({required this.tournament, required this.approved});
+  const _Scarcity({required this.tournament, required this.participants});
 
   final Tournament tournament;
-  final List<TournamentRegistration> approved;
+  final List<TournamentParticipant> participants;
 
   @override
   Widget build(BuildContext context) {
     final max = tournament.maxTeams;
-    final count = approved.isEmpty ? tournament.approvedTeamsCount : approved.length;
+    final count = participants.isEmpty
+        ? tournament.approvedTeamsCount
+        : participants.length;
     final left = max == null ? null : (max - count).clamp(0, max);
 
     return Padding(
@@ -309,18 +314,18 @@ class _Scarcity extends StatelessWidget {
                 ),
             ],
           ),
-          if (approved.isNotEmpty) ...[
+          if (participants.isNotEmpty) ...[
             const SizedBox(height: 9),
             Row(
               children: [
-                for (final reg in approved.take(4)) ...[
-                  _MiniCrest(registration: reg),
+                for (final p in participants.take(4)) ...[
+                  _MiniCrest(participant: p),
                   const SizedBox(width: 5),
                 ],
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    _alreadyIn(approved),
+                    _alreadyIn(participants),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: CkType.body(fontSize: 11.5, color: CkColors.muted),
@@ -334,23 +339,23 @@ class _Scarcity extends StatelessWidget {
     );
   }
 
-  static String _alreadyIn(List<TournamentRegistration> approved) {
+  static String _alreadyIn(List<TournamentParticipant> participants) {
     final names =
-        approved.take(2).map((r) => r.teamName ?? 'A team').toList();
-    final rest = approved.length - names.length;
+        participants.take(2).map((p) => p.teamName).toList();
+    final rest = participants.length - names.length;
     return '${names.join(', ')}${rest > 0 ? ' +$rest' : ''} already in';
   }
 }
 
 class _MiniCrest extends StatelessWidget {
-  const _MiniCrest({required this.registration});
+  const _MiniCrest({required this.participant});
 
-  final TournamentRegistration registration;
+  final TournamentParticipant participant;
 
   @override
   Widget build(BuildContext context) {
-    final name = registration.teamName ?? '';
-    final explicit = registration.teamMonogram?.trim();
+    final name = participant.teamName;
+    final explicit = participant.logoMonogram?.trim();
     final words = name.trim().split(RegExp(r'\s+'));
     final mono = explicit != null && explicit.isNotEmpty
         ? explicit.toUpperCase()

@@ -15,6 +15,7 @@ import '../../domain/entities/tournament_fee_entry.dart';
 import '../../domain/entities/tournament_leader.dart';
 import '../../domain/entities/tournament_organizer.dart';
 import '../../domain/entities/tournament_live_match.dart';
+import '../../domain/entities/tournament_participant.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/entities/tournament_standing.dart';
 import '../../domain/repositories/tournaments_repository.dart';
@@ -77,6 +78,19 @@ Future<List<TournamentRegistration>> tournamentRegistrations(
   return result.fold(
     (failure) => throw Exception(failure.message),
     (registrations) => registrations,
+  );
+}
+
+@riverpod
+Future<List<TournamentParticipant>> tournamentParticipants(
+  Ref ref,
+  String tournamentId,
+) async {
+  final repo = ref.watch(tournamentsRepositoryProvider);
+  final result = await repo.getTournamentParticipants(tournamentId);
+  return result.fold(
+    (failure) => throw Exception(failure.message),
+    (participants) => participants,
   );
 }
 

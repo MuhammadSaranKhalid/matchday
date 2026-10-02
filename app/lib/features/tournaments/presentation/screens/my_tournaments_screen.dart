@@ -315,14 +315,7 @@ class _OrganizingCard extends ConsumerWidget {
         t.maxTeams == null
             ? pendingAll
             : (t.maxTeams! - approved).clamp(0, pendingAll);
-    final paid =
-        regs
-            .where(
-              (r) =>
-                  r.isApproved &&
-                  (r.paymentStatus ?? '').toLowerCase() == 'paid',
-            )
-            .length;
+
 
     final chips = <Widget>[
       if (t.status == TournamentStatus.registration &&
@@ -366,10 +359,7 @@ class _OrganizingCard extends ConsumerWidget {
           note:
               isLive && board != null
                   ? _liveNote(board)
-                  : hubFeeNote(
-                    t,
-                    paidCount: (t.entryFee ?? 0) > 0 ? paid : null,
-                  ),
+                  : hubFeeNote(t),
           action: 'Manage Console',
         ),
       ],
@@ -515,8 +505,8 @@ class _AwaitingBody extends StatelessWidget {
           runSpacing: 8,
           children: [
             const HubNeutralChip(label: 'Submitted · under review'),
-            if (fee > 0 && (reg.paymentStatus ?? '').toLowerCase() != 'paid')
-              const HubCreamChip(label: 'Pending payment'),
+            if (fee > 0)
+              const HubCreamChip(label: 'Fee applicable'),
           ],
         ),
         const SizedBox(height: 9),

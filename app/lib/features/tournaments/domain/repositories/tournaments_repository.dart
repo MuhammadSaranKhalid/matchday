@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failures.dart';
 import '../../../matches/domain/entities/match.dart';
-import '../draw/draw_plan.dart';
 import '../entities/ground.dart';
 import '../entities/my_tournament_entry.dart';
 import '../entities/scorer_candidate.dart';
@@ -17,6 +16,7 @@ import '../entities/tournament_leader.dart';
 import '../entities/tournament_organizer.dart';
 import '../ops/revised_target.dart';
 import '../entities/tournament_live_match.dart';
+import '../entities/tournament_participant.dart';
 import '../entities/tournament_registration.dart';
 import '../entities/tournament_squad_member.dart';
 import '../entities/tournament_standing.dart';
@@ -111,8 +111,14 @@ abstract class TournamentsRepository {
 
   Future<Either<Failure, void>> cancelTournament(String tournamentId, String reason);
 
-  // Registrations
+  // Registrations & Participants
   Future<Either<Failure, List<TournamentRegistration>>> getTournamentRegistrations(
+    String tournamentId,
+  );
+
+  /// Safe public read of accepted tournament participants derived strictly
+  /// from tournament_entries + teams.
+  Future<Either<Failure, List<TournamentParticipant>>> getTournamentParticipants(
     String tournamentId,
   );
 
@@ -136,9 +142,6 @@ abstract class TournamentsRepository {
   /// Withdraws an accepted Entry after approval.
   Future<Either<Failure, void>> withdrawEntry(String entryId, {String? reason});
 
-  /// Transitional alias for backward compatibility.
-  Future<Either<Failure, void>> withdrawRegistration(String registrationId);
-
   /// Canonical query for accepted entries in a tournament.
   Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(String tournamentId);
 
@@ -161,22 +164,6 @@ abstract class TournamentsRepository {
   /// Canonical query for payment ledger history of a tournament entry.
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
 
-
-  Future<Either<Failure, void>> assignTeamGroup({
-    required String registrationId,
-    required String? groupId,
-  });
-
-  Future<Either<Failure, void>> assignMultipleTeamsGroup({
-    required List<String> registrationIds,
-    required String? groupId,
-  });
-
-  Future<Either<Failure, void>> autoDistributeGroups({
-    required String tournamentId,
-    required List<String> groupNames,
-  });
-
   // Fixtures, Bracket & Standings
   Future<Either<Failure, List<Match>>> getTournamentFixtures(
     String tournamentId,
@@ -188,18 +175,7 @@ abstract class TournamentsRepository {
 
   Stream<List<TournamentStanding>> watchStandings(String tournamentId);
 
-  /// Publishes the draw and returns how many fixtures were created.
-  ///
-  /// Takes the whole [DrawPlan] — every round, including the unresolved ones
-  /// linked by feeder slot — rather than a flat slot list, because a knockout
-  /// with only its first round inserted has nothing for the advancement
-  /// trigger to move winners into. [seedOrder] is the approved teams in draw
-  /// order; position becomes `seed_number`, written in the same transaction.
-  Future<Either<Failure, int>> generateAndPublishFixtures({
-    required String tournamentId,
-    required DrawPlan plan,
-    List<String> seedOrder = const [],
-  });
+
 
   // Awards
   Future<Either<Failure, TournamentAwards>> getSuggestedAwards(

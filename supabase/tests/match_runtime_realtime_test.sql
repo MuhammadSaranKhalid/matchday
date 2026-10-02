@@ -97,20 +97,31 @@ select is(
 );
 
 insert into public.tournaments (
-  tournament_id, tournament_name, tournament_type, sport_id, status
+  tournament_id, tournament_name, tournament_type, sport_id, publication_state, owner_user_id
 )
 values (
-  '14000000-0000-4000-8000-000000000001', 'Runtime Cup', 'knockout', 'cricket', 'upcoming'
+  '14000000-0000-4000-8000-000000000001', 'Runtime Cup', 'knockout', 'cricket', 'published', '00000000-0000-0000-0000-000000000001'
 );
 
-insert into public.tournament_teams (
-  tournament_id, team_id, status, squad, decided_at
+insert into public.tournament_entries (
+  entry_id, tournament_id, team_id, status, accepted_at
 )
 values (
+  '15000000-0000-4000-8000-000000000001',
   '14000000-0000-4000-8000-000000000001',
   '11000000-0000-4000-8000-000000000003',
-  'approved',
-  array['12000000-0000-4000-8000-000000000006'::uuid],
+  'active',
+  now()
+);
+
+insert into public.tournament_squad_members (
+  entry_id, tournament_id, unclaimed_id, membership_status, added_at
+)
+values (
+  '15000000-0000-4000-8000-000000000001',
+  '14000000-0000-4000-8000-000000000001',
+  '12000000-0000-4000-8000-000000000006',
+  'active',
   now()
 );
 

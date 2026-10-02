@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../matches/domain/entities/match.dart';
-import '../../domain/draw/draw_plan.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/ground.dart';
 import '../../domain/entities/match_official.dart';
@@ -23,6 +22,7 @@ import '../models/tournament_entry_payment_dto.dart';
 import '../models/tournament_fixture_dto.dart';
 import '../models/tournament_leader_dto.dart';
 import '../models/tournament_live_match_dto.dart';
+import '../models/tournament_participant_dto.dart';
 import '../models/tournament_registration_dto.dart';
 import '../models/tournament_squad_member_dto.dart';
 import '../models/tournament_standing_dto.dart';
@@ -33,7 +33,6 @@ class TournamentsRemoteDataSource {
   final SupabaseClient _supabase;
 
   static const _tournamentsTable = 'tournaments';
-  static const _registrationsTable = 'tournament_teams';
   static const _canonicalRegistrationsTable = 'tournament_registrations';
   static const _canonicalEntriesTable = 'tournament_entries';
   static const _canonicalSquadMembersTable = 'tournament_squad_members';
@@ -119,15 +118,10 @@ class TournamentsRemoteDataSource {
       // and disagreed with `search-all`, which has always filtered on
       // `approved`. An embedded filter would have fixed the number but a
       // `!inner` join drops the tournament row entirely when nobody is
-      // approved yet, which is every cup on its first day.
-      final countRes = await _supabase
-          .from('tournament_public_participants')
-          .select('entry_id')
-          .eq('tournament_id', tournamentId)
-          .count(CountOption.exact);
+      final participants = await getTournamentParticipants(tournamentId);
 
       final copy = Map<String, dynamic>.from(response);
-      copy['approved_teams_count'] = countRes.count;
+      copy['approved_teams_count'] = participants.length;
 
       return TournamentDto.fromJson(copy);
     } on PostgrestException catch (e) {
@@ -138,12 +132,32 @@ class TournamentsRemoteDataSource {
   Future<List<TournamentDto>> getMyTournaments() async {
     final uid = _requireUid();
     try {
-      // 1. Tournaments organized by user
-      final organizedRows = await _supabase
-          .from(_tournamentsTable)
-          .select()
-          .or('created_by.eq.$uid,organizers.cs.{$uid}')
-          .order('updated_at', ascending: false);
+      // 1. Tournaments organized by user via owner_user_id or active membership
+      final membershipRows = await _supabase
+          .from('tournament_memberships')
+          .select('tournament_id')
+          .eq('user_id', uid)
+          .eq('status', 'active');
+      final memberTournamentIds = membershipRows
+          .map((r) => r['tournament_id'] as String?)
+          .whereType<String>()
+          .toList();
+
+      final List<Map<String, dynamic>> organizedRows;
+      if (memberTournamentIds.isNotEmpty) {
+        final idList = memberTournamentIds.join(',');
+        organizedRows = await _supabase
+            .from(_tournamentsTable)
+            .select()
+            .or('owner_user_id.eq.$uid,tournament_id.in.($idList)')
+            .order('updated_at', ascending: false);
+      } else {
+        organizedRows = await _supabase
+            .from(_tournamentsTable)
+            .select()
+            .eq('owner_user_id', uid)
+            .order('updated_at', ascending: false);
+      }
 
       // 2. Tournaments followed by user
       final followedRows = await _supabase
@@ -228,7 +242,6 @@ class TournamentsRemoteDataSource {
         'privacy': params.privacy.wire,
         'created_by': uid,
         'owner_user_id': uid,
-        'organizers': [uid],
         // Canonical lifecycle fields (Draft):
         'publication_state': 'draft',
         'registration_state': 'not_open',
@@ -343,7 +356,7 @@ class TournamentsRemoteDataSource {
       String tournamentId) async {
     try {
       final rows = await _supabase
-          .from(_registrationsTable)
+          .from(_canonicalRegistrationsTable)
           .select('''
             *,
             teams (
@@ -360,17 +373,27 @@ class TournamentsRemoteDataSource {
           .order('registered_at', ascending: true);
 
       return rows.map(TournamentRegistrationDto.fromJson).toList();
-    } on PostgrestException catch (_) {
-      // Fallback to sanitized public participants projection for spectator/unauthenticated access
-      try {
-        final publicRows = await _supabase
-            .from('tournament_public_participants')
-            .select()
-            .eq('tournament_id', tournamentId);
-        return publicRows.map(TournamentRegistrationDto.fromJson).toList();
-      } on PostgrestException catch (e) {
-        throw ServerException(e.message);
-      }
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// Safe public read of accepted tournament participants derived strictly
+  /// from tournament_entries + teams via security definer RPC.
+  Future<List<TournamentParticipantDto>> getTournamentParticipants(
+      String tournamentId) async {
+    try {
+      final rows = await _supabase.rpc<List<dynamic>>(
+        'get_tournament_public_participants',
+        params: {'p_tournament_id': tournamentId},
+      );
+
+      return rows
+          .map((row) => TournamentParticipantDto.fromJson(
+              Map<String, dynamic>.from(row as Map)))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
     }
   }
 
@@ -444,7 +467,7 @@ class TournamentsRemoteDataSource {
       {String? reason}) async {
     try {
       await _supabase.rpc<void>(
-        'withdraw_tournament_registration',
+        'withdraw_tournament_pending_registration',
         params: {
           'p_registration_id': registrationId,
           if (reason != null) 'p_reason': reason,
@@ -469,10 +492,6 @@ class TournamentsRemoteDataSource {
       throw ServerException(e.message);
     }
   }
-
-  /// Transitional alias for backward compatibility.
-  Future<void> withdrawRegistration(String registrationId) =>
-      withdrawPendingRegistration(registrationId);
 
   // ─── Canonical Entry / Squad / Payment Queries ─────────────────────────────
 
@@ -575,53 +594,7 @@ class TournamentsRemoteDataSource {
   }
 
 
-  Future<void> assignTeamGroup(String registrationId, String? groupId) async {
-    try {
-      await _supabase
-          .from(_registrationsTable)
-          .update({'group_id': groupId})
-          .eq('registration_id', registrationId);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
 
-  Future<void> assignMultipleTeamsGroup(
-      List<String> registrationIds, String? groupId) async {
-    if (registrationIds.isEmpty) return;
-    try {
-      await _supabase
-          .from(_registrationsTable)
-          .update({'group_id': groupId})
-          .inFilter('registration_id', registrationIds);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
-
-  Future<void> autoDistributeGroups(
-      String tournamentId, List<String> groupNames) async {
-    if (groupNames.isEmpty) return;
-    try {
-      final rows = await _supabase
-          .from(_registrationsTable)
-          .select('registration_id')
-          .eq('tournament_id', tournamentId)
-          .eq('status', 'approved')
-          .order('registered_at', ascending: true);
-
-      for (int i = 0; i < rows.length; i++) {
-        final regId = rows[i]['registration_id'] as String;
-        final assignedGroup = groupNames[i % groupNames.length];
-        await _supabase
-            .from(_registrationsTable)
-            .update({'group_id': assignedGroup})
-            .eq('registration_id', regId);
-      }
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
 
   // ─── Fixtures & Standings ──────────────────────────────────────────────────
 
@@ -676,49 +649,7 @@ class TournamentsRemoteDataSource {
         .map((rows) => rows.map(TournamentStandingDto.fromJson).toList());
   }
 
-  /// Publishes the draw.
-  ///
-  /// Goes through an RPC rather than inserting: `matches` has RLS enabled with
-  /// only a SELECT policy, so a client-side insert is rejected — silently, as
-  /// far as the organiser could tell. Returns the number of fixtures created.
-  ///
-  /// The whole plan goes over, unresolved rounds included. Feeder links travel
-  /// as the plan's own `slot_id` strings because no match id exists yet; the
-  /// RPC mints the ids and resolves them.
-  Future<int> generateAndPublishFixtures({
-    required String tournamentId,
-    required DrawPlan plan,
-    List<String> seedOrder = const [],
-  }) async {
-    try {
-      final count = await _supabase.rpc<int>(
-        'tournament_generate_fixtures',
-        params: {
-          'p_tournament_id': tournamentId,
-          'p_slots': [
-            for (final f in plan.fixtures)
-              {
-                'slot_id': f.slotId,
-                'team_a_id': f.teamAId,
-                'team_b_id': f.teamBId,
-                'prev_slot_a': f.prevSlotAId,
-                'prev_slot_b': f.prevSlotBId,
-                'scheduled_start_time':
-                    f.scheduledStartTime.toUtc().toIso8601String(),
-                'venue': f.venue,
-                'round': f.roundLabel,
-                'bracket_round_number': f.roundNumber,
-                'bracket_match_number': f.matchNumber,
-              },
-          ],
-          'p_seed_order': seedOrder,
-        },
-      );
-      return count;
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
-  }
+
 
   Future<TournamentAwards> getSuggestedAwards(String tournamentId) async {
     try {
@@ -758,7 +689,7 @@ class TournamentsRemoteDataSource {
     if (teamIds.isEmpty) return [];
     try {
       final rows = await _supabase
-          .from(_registrationsTable)
+          .from(_canonicalRegistrationsTable)
           .select('''
             *,
             teams (

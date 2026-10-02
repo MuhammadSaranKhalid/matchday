@@ -5,7 +5,7 @@ import 'package:matchday/core/database/database_provider.dart';
 import 'package:matchday/core/database/wizard_draft_store.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
+import 'package:matchday/core/supabase/supabase_current_user_id_provider.dart';
 import 'package:matchday/features/tournaments/presentation/providers/tournaments_providers.dart';
 import 'package:matchday/features/tournaments/presentation/screens/tournament_create_wizard_screen.dart';
 
@@ -49,8 +49,7 @@ void main() {
 
     Widget wizard() => ProviderScope(
           overrides: [
-            currentUserStreamProvider
-                .overrideWith((ref) => Stream.value(mockUser)),
+            currentUserIdProvider.overrideWithValue('org-user-1'),
             wizardDraftStoreProvider.overrideWithValue(mockDraftStore),
           ],
           child: const MaterialApp(home: TournamentCreateWizardScreen()),

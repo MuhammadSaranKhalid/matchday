@@ -9,6 +9,7 @@ import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_awards.dart';
+import 'package:matchday/features/tournaments/domain/entities/tournament_participant.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_registration.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_standing.dart';
 import 'package:matchday/features/tournaments/presentation/providers/tournaments_providers.dart';
@@ -29,7 +30,7 @@ void main() {
       status: TournamentStatus.registration,
       privacy: TournamentPrivacy.public,
       createdBy: 'user-1',
-      organizers: const ['user-1'],
+      ownerUserId: 'user-1',
       venues: const [TournamentVenue(name: 'Gaddafi Stadium', city: 'Lahore')],
       city: 'Lahore',
       startDate: DateTime(2026, 9, 1),
@@ -73,7 +74,7 @@ void main() {
         status: TournamentRegistrationStatus.approved,
         registeredBy: 'user-1',
         registeredAt: DateTime.now(),
-        squad: const [],
+        squadProposal: const [],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
@@ -85,9 +86,28 @@ void main() {
         status: TournamentRegistrationStatus.approved,
         registeredBy: 'user-2',
         registeredAt: DateTime.now(),
-        squad: const [],
+        squadProposal: const [],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+      ),
+    ];
+
+    final mockParticipants = <TournamentParticipant>[
+      TournamentParticipant(
+        entryId: 'entry-1',
+        tournamentId: 'tourn-detail-1',
+        teamId: 'team-a',
+        teamName: 'Model Town CC',
+        status: 'active',
+        acceptedAt: DateTime.now(),
+      ),
+      TournamentParticipant(
+        entryId: 'entry-2',
+        tournamentId: 'tourn-detail-1',
+        teamId: 'team-b',
+        teamName: 'Cantt CC',
+        status: 'active',
+        acceptedAt: DateTime.now(),
       ),
     ];
 
@@ -95,13 +115,14 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            currentUserStreamProvider.overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentFixturesProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockFixtures)),
             tournamentRegistrationsProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockRegistrations)),
+            tournamentParticipantsProvider('tourn-detail-1')
+                .overrideWith((ref) => Future.value(mockParticipants)),
             tournamentAwardsProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(const TournamentAwards())),
             tournamentStandingsStreamProvider('tourn-detail-1')
@@ -126,27 +147,28 @@ void main() {
       // (artboards 09-15), so the Overview CTA sits below the fold on a
       // phone-sized viewport — scroll to it rather than shrinking the header.
       await tester.scrollUntilVisible(
-        find.textContaining('Register Your Team'),
+        find.textContaining('Register a Team'),
         250,
         scrollable: find.byType(Scrollable).last,
       );
 
       // The CTA carries the fee, because "is it worth PKR 15,000" is one of
       // the three questions artboard 09 is built around.
-      expect(find.textContaining('Register Your Team'), findsOneWidget);
+      expect(find.textContaining('Register a Team'), findsOneWidget);
     });
 
     testWidgets('switches to Teams tab and displays approved teams', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            currentUserStreamProvider.overrideWith((ref) => Stream.value(mockUser)),
             tournamentDetailProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockTournament)),
             tournamentFixturesProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockFixtures)),
             tournamentRegistrationsProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(mockRegistrations)),
+            tournamentParticipantsProvider('tourn-detail-1')
+                .overrideWith((ref) => Future.value(mockParticipants)),
             tournamentAwardsProvider('tourn-detail-1')
                 .overrideWith((ref) => Future.value(const TournamentAwards())),
             tournamentStandingsStreamProvider('tourn-detail-1')

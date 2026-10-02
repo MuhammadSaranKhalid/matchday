@@ -19,7 +19,7 @@ import '../models/tournament_dto.dart';
 import '../models/tournament_fee_entry_dto.dart';
 import '../models/tournament_entry_dto.dart';
 import '../models/tournament_entry_payment_dto.dart';
-import '../models/tournament_fixture_dto.dart';
+import '../models/tournament_match_dto.dart';
 import '../models/tournament_leader_dto.dart';
 import '../models/tournament_live_match_dto.dart';
 import '../models/tournament_participant_dto.dart';
@@ -609,7 +609,7 @@ class TournamentsRemoteDataSource {
           .order('scheduled_start_time', ascending: true);
 
       return rows
-          .map((r) => TournamentFixtureDto.fromJson(r).toEntity())
+          .map((r) => LegacyTournamentMatchDto.fromJson(r).toEntity())
           .toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

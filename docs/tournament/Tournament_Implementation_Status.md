@@ -1913,8 +1913,8 @@ With zero active production users and zero legacy data requiring backward compat
      - `organizers` (`uuid[]`) — replaced authoritatively by canonical RBAC table `tournament_memberships` and `owner_user_id`. Provenance remains `created_by`.
      - `status` (`text`) — replaced authoritatively by the five canonical orthogonal lifecycle axes:
        - `publication_state` (`draft`, `published`)
-       - `registration_state` (`closed`, `open`, `paused`, `completed`)
-       - `entry_state` (`open`, `locked`)
+       - `registration_state` (`not_open`, `open`, `closed`)
+       - `entry_state` (`editable`, `locked`)
        - `competition_state` (`not_started`, `in_progress`, `completed`)
        - `termination_state` (`none`, `cancelled`, `abandoned`)
        There is NO duplicate stored lifecycle machine (`lifecycle_state` and `workflow_status` do not exist).
@@ -2012,6 +2012,103 @@ All quality gates passed with zero regressions.
 Phase 4 has NOT begun.
 ================================================================================
 ```
+
+---
+
+## 25. PHASE 4 — CANONICAL TOURNAMENT STRUCTURE FOUNDATION (COMPLETED)
+
+### 25.1 Summary of Architecture & Implemented Artifacts
+
+Phase 4 establishes the first-class relational structure for tournament competitions, replacing all flattened, inferred, or hardcoded bracket topologies:
+
+```text
+Tournament
+   ↓
+Stage (`tournament_stages`)
+   ↓
+Stage Entry (`tournament_stage_entries`)
+   ↓
+Group (`tournament_groups`)
+   ↓
+Round (`tournament_rounds`)
+   ↓
+Draw Revision (`tournament_draw_revisions`)
+   ↓
+Fixture (`tournament_fixtures`)
+   ↓
+Fixture Slots (`tournament_fixture_slots`)
+```
+
+#### A. Database Migrations Added
+1. **`20261001000260_tournament_authority_hygiene.sql`**: Pre-flight cleanup removing dead fallback `owner_user_id IS NULL AND created_by = auth.uid()` and renaming stale organizer policy names.
+2. **`20261001000300_tournament_stages.sql`**: `public.tournament_stages` with composite candidate key `(stage_id, tournament_id)` and unique `(tournament_id, sequence)`.
+3. **`20261001000310_tournament_groups.sql`**: `public.tournament_groups` with composite candidate key `(group_id, stage_id)` and unique `(stage_id, sequence)`.
+4. **`20261001000320_tournament_stage_entries.sql`**: `public.tournament_stage_entries` with composite candidate key `(stage_entry_id, stage_id)`, composite foreign keys ensuring entry and group belong to the exact stage, and unique seed per stage `(stage_id, seed)`.
+5. **`20261001000330_tournament_rounds.sql`**: `public.tournament_rounds` with composite candidate key `(round_id, stage_id)` and unique `(stage_id, group_id, round_number)`.
+6. **`20261001000340_tournament_draw_revisions.sql`**: `public.tournament_draw_revisions` supporting immutable versioned draw publication history with `trg_draw_revisions_immutability` enforcing that `published` or `superseded` revisions cannot be deleted or modified.
+7. **`20261001000350_tournament_fixtures.sql`**: `public.tournament_fixtures` separating scheduling and competitive pairing from physical match execution.
+8. **`20261001000360_tournament_fixture_slots.sql`**: `public.tournament_fixture_slots` with strict typed sources (`entry`, `seed`, `fixture_winner`, `fixture_loser`, `group_rank`, `stage_rank`, `bye`), constraint `chk_fixture_slot_source_shape`, and trigger `enforce_fixture_slot_integrity()` guaranteeing cross-tournament referential integrity.
+
+#### B. Development Seeds (`supabase/seed.sql`)
+- **Single Elimination Tournament**: Lahore Champions Cup (4 entries, Semi-finals, Final, direct ENTRY and FIXTURE_WINNER slots).
+- **Round Robin Tournament**: Punjab Triangular League (3 entries, 3 rounds, 3 fixtures, direct ENTRY slots).
+- **Group + Knockout Tournament**: National Championship (Stage 1 Groups A & B with RR fixtures; Stage 2 Playoffs Final with symbolic `GROUP_RANK` slots).
+
+#### C. Flutter Clean Architecture Domain & Data Objects
+- Pure Dart entities in `app/lib/features/tournaments/domain/entities/`:
+  - `TournamentStage`
+  - `TournamentGroup`
+  - `TournamentStageEntry`
+  - `TournamentRound`
+  - `TournamentDrawRevision`
+  - `TournamentFixture`
+  - `TournamentFixtureSlot` & `FixtureSlotSource`
+- Data layer DTOs in `app/lib/features/tournaments/data/models/`:
+  - `TournamentStageDto`
+  - `TournamentGroupDto`
+  - `TournamentStageEntryDto`
+  - `TournamentRoundDto`
+  - `TournamentDrawRevisionDto`
+  - `TournamentFixtureDto`
+  - `TournamentFixtureSlotDto`
+  - `LegacyTournamentMatchDto` (preserves backward compatibility for legacy cricket matches view queries)
+
+---
+
+### 25.2 Quality Gates & Verification Matrix
+
+| Quality Gate | Command | Result |
+|---|---|---|
+| **Static Analysis** | `flutter analyze lib/` | **PASS (0 issues)** |
+| **Architecture Invariants** | `flutter test test/architecture_test.dart` | **PASS (9/9 test groups passed)** |
+| **Domain Package Purity** | `grep -rlE ... lib/features/*/domain` | **PASS (0 matches, pure Dart)** |
+| **Migration Layout Guard** | `flutter test test/supabase/migration_layout_test.dart` | **PASS (3/3 passed)** |
+| **Database pgTAP Realtime Invariants** | `supabase test db supabase/tests/match_runtime_realtime_test.sql` | **PASS (14/14 passed)** |
+| **Tournaments Test Suite** | `flutter test test/features/tournaments/` | **PASS (194/194 passed)** |
+| **Cricket Scoring Engine Suite** | `flutter test test/features/matches/domain/scoring/` | **PASS (76/76 passed)** |
+| **Backend Integration Suite** | `pnpm test` (in `backend/`) | **PASS (138/138 passed)** |
+| **Fresh Database Reset & Seeds** | `supabase db reset --yes` | **PASS (Clean rebuild & canonical seed)** |
+| **SQL Structural Invariants** | Negative + Positive test suite (`test_phase4_structure.sql`) | **PASS (All 8 negative DO blocks & positive topologies passed)** |
+| **Scope Purity (Phase 5+ absence)** | No command router, no match execution, no progression, no standings engine | **PASS (Zero Phase 5+ concepts introduced)** |
+
+---
+
+### 25.3 Phase 4 Final Gate Verdict
+
+```text
+================================================================================
+PHASE 4 GATE: PASS
+================================================================================
+Phase 4 (Canonical Tournament Structure Foundation) is complete and mechanically verified.
+Canonical relational structure established:
+  Tournament -> Stage -> Group -> StageEntry -> Round -> DrawRevision -> Fixture -> FixtureSlot.
+Typed slot source references, immutability triggers, cross-tournament isolation,
+development seeds, pure Dart domain entities, and data DTOs verified.
+All quality gates passed with zero regressions.
+Phase 5 has NOT begun.
+================================================================================
+```
+
 
 
 

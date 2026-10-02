@@ -1514,6 +1514,264 @@ begin
   raise notice 'Message request DM seeded successfully from Adeel Saeed to Saran.';
 end $seed_dm$;
 
+-- =============================================================================
+-- CANONICAL TOURNAMENT STRUCTURE SEEDS (Phase 4 Foundation)
+-- =============================================================================
+
+do $seed_tournaments$
+declare
+  v_owner uuid;
+begin
+  select id into v_owner
+    from auth.users
+   where email = 'muhammadsarankhalid@gmail.com';
+  if v_owner is null then
+    v_owner := '00000000-0000-0000-0000-000000000001'::uuid;
+  end if;
+
+  -- 1. Single Elimination Tournament (4 teams: SF1, SF2 -> Final)
+  insert into public.tournaments (
+    tournament_id, tournament_name, tournament_type, sport_id,
+    publication_state, registration_state, entry_state, competition_state, termination_state,
+    owner_user_id, created_by
+  ) values (
+    'a0000000-0000-0000-0000-000000000001', 'Lahore Champions Cup (Knockout)', 'knockout', 'cricket',
+    'published', 'closed', 'locked', 'in_progress', 'none',
+    v_owner, v_owner
+  ) on conflict (tournament_id) do nothing;
+
+  -- Entries
+  insert into public.tournament_entries (entry_id, tournament_id, team_id, status)
+  values
+    ('e0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111101', 'active'),
+    ('e0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111102', 'active'),
+    ('e0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111103', 'active'),
+    ('e0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111104', 'active')
+  on conflict (entry_id) do nothing;
+
+  -- Stage: Playoffs
+  insert into public.tournament_stages (stage_id, tournament_id, sequence, name, competition_format, state)
+  values ('50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 1, 'Playoffs', 'single_elimination', 'active')
+  on conflict (stage_id) do nothing;
+
+  -- Stage Entries
+  insert into public.tournament_stage_entries (stage_entry_id, stage_id, entry_id, tournament_id, seed, status)
+  values
+    ('5e000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 1, 'active'),
+    ('5e000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 2, 'active'),
+    ('5e000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 3, 'active'),
+    ('5e000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000001', 4, 'active')
+  on conflict (stage_entry_id) do nothing;
+
+  -- Rounds
+  insert into public.tournament_rounds (round_id, stage_id, tournament_id, round_number, label)
+  values
+    ('60000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 1, 'Semi-finals'),
+    ('60000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 2, 'Final')
+  on conflict (round_id) do nothing;
+
+  -- Draw Revision
+  insert into public.tournament_draw_revisions (
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+  ) values (
+    '65000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+    1, 'published', 1, '{"fixtures_count": 3}'::jsonb
+  ) on conflict (draw_revision_id) do nothing;
+
+  -- Fixtures
+  insert into public.tournament_fixtures (fixture_id, tournament_id, stage_id, round_id, draw_revision_id, fixture_number, state)
+  values
+    ('70000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '65000000-0000-0000-0000-000000000001', 1, 'ready'),
+    ('70000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '65000000-0000-0000-0000-000000000001', 2, 'ready'),
+    ('70000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', '65000000-0000-0000-0000-000000000001', 1, 'unresolved')
+  on conflict (fixture_id) do nothing;
+
+  -- Fixture Slots
+  insert into public.tournament_fixture_slots (fixture_id, tournament_id, stage_id, side, source_type, source_entry_id)
+  values
+    ('70000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'A', 'entry', 'e0000000-0000-0000-0000-000000000001'),
+    ('70000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'B', 'entry', 'e0000000-0000-0000-0000-000000000004'),
+    ('70000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'A', 'entry', 'e0000000-0000-0000-0000-000000000002'),
+    ('70000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'B', 'entry', 'e0000000-0000-0000-0000-000000000003')
+  on conflict (fixture_id, side) do nothing;
+
+  insert into public.tournament_fixture_slots (fixture_id, tournament_id, stage_id, side, source_type, source_fixture_id)
+  values
+    ('70000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'A', 'fixture_winner', '70000000-0000-0000-0000-000000000001'),
+    ('70000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'B', 'fixture_winner', '70000000-0000-0000-0000-000000000002')
+  on conflict (fixture_id, side) do nothing;
+
+  -- 2. Round Robin Tournament (3 teams: 3 fixtures)
+  insert into public.tournaments (
+    tournament_id, tournament_name, tournament_type, sport_id,
+    publication_state, registration_state, entry_state, competition_state, termination_state,
+    owner_user_id, created_by
+  ) values (
+    'a0000000-0000-0000-0000-000000000002', 'Punjab Triangular League (Round Robin)', 'round_robin', 'cricket',
+    'published', 'closed', 'locked', 'in_progress', 'none',
+    v_owner, v_owner
+  ) on conflict (tournament_id) do nothing;
+
+  -- Entries
+  insert into public.tournament_entries (entry_id, tournament_id, team_id, status)
+  values
+    ('e0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111101', 'active'),
+    ('e0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111102', 'active'),
+    ('e0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111103', 'active')
+  on conflict (entry_id) do nothing;
+
+  -- Stage: League Phase
+  insert into public.tournament_stages (stage_id, tournament_id, sequence, name, competition_format, state)
+  values ('50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 1, 'League Phase', 'round_robin', 'active')
+  on conflict (stage_id) do nothing;
+
+  -- Stage Entries
+  insert into public.tournament_stage_entries (stage_entry_id, stage_id, entry_id, tournament_id, status)
+  values
+    ('5e000000-0000-0000-0000-000000000005', '50000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000002', 'active'),
+    ('5e000000-0000-0000-0000-000000000006', '50000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', 'active'),
+    ('5e000000-0000-0000-0000-000000000007', '50000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000002', 'active')
+  on conflict (stage_entry_id) do nothing;
+
+  -- Rounds
+  insert into public.tournament_rounds (round_id, stage_id, tournament_id, round_number, label)
+  values
+    ('60000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 1, 'Round 1'),
+    ('60000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 2, 'Round 2'),
+    ('60000000-0000-0000-0000-000000000005', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 3, 'Round 3')
+  on conflict (round_id) do nothing;
+
+  -- Draw Revision
+  insert into public.tournament_draw_revisions (
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+  ) values (
+    '65000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002',
+    1, 'published', 1, '{"fixtures_count": 3}'::jsonb
+  ) on conflict (draw_revision_id) do nothing;
+
+  -- Fixtures
+  insert into public.tournament_fixtures (fixture_id, tournament_id, stage_id, round_id, draw_revision_id, fixture_number, state)
+  values
+    ('70000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000003', '65000000-0000-0000-0000-000000000002', 1, 'ready'),
+    ('70000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000004', '65000000-0000-0000-0000-000000000002', 1, 'ready'),
+    ('70000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000005', '65000000-0000-0000-0000-000000000002', 1, 'ready')
+  on conflict (fixture_id) do nothing;
+
+  -- Fixture Slots
+  insert into public.tournament_fixture_slots (fixture_id, tournament_id, stage_id, side, source_type, source_entry_id)
+  values
+    ('70000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'A', 'entry', 'e0000000-0000-0000-0000-000000000005'),
+    ('70000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'B', 'entry', 'e0000000-0000-0000-0000-000000000006'),
+    ('70000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'A', 'entry', 'e0000000-0000-0000-0000-000000000006'),
+    ('70000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'B', 'entry', 'e0000000-0000-0000-0000-000000000007'),
+    ('70000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'A', 'entry', 'e0000000-0000-0000-0000-000000000007'),
+    ('70000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000002', 'B', 'entry', 'e0000000-0000-0000-0000-000000000005')
+  on conflict (fixture_id, side) do nothing;
+
+  -- 3. Group + Knockout Tournament (Stage 1: Groups A & B -> Stage 2: Final with GROUP_RANK)
+  insert into public.tournaments (
+    tournament_id, tournament_name, tournament_type, sport_id,
+    publication_state, registration_state, entry_state, competition_state, termination_state,
+    owner_user_id, created_by
+  ) values (
+    'a0000000-0000-0000-0000-000000000003', 'National Championship (Group + Knockout)', 'group_knockout', 'cricket',
+    'published', 'closed', 'locked', 'in_progress', 'none',
+    v_owner, v_owner
+  ) on conflict (tournament_id) do nothing;
+
+  -- Entries
+  insert into public.tournament_entries (entry_id, tournament_id, team_id, status)
+  values
+    ('e0000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111101', 'active'),
+    ('e0000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111102', 'active'),
+    ('e0000000-0000-0000-0000-000000000010', 'a0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111103', 'active'),
+    ('e0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111104', 'active')
+  on conflict (entry_id) do nothing;
+
+  -- Stage 1: Group Stage
+  insert into public.tournament_stages (stage_id, tournament_id, sequence, name, competition_format, state)
+  values ('50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', 1, 'Group Stage', 'round_robin', 'active')
+  on conflict (stage_id) do nothing;
+
+  -- Groups
+  insert into public.tournament_groups (group_id, stage_id, tournament_id, sequence, name)
+  values
+    ('55000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', 1, 'Group A'),
+    ('55000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', 2, 'Group B')
+  on conflict (group_id) do nothing;
+
+  -- Stage 1 Entries
+  insert into public.tournament_stage_entries (stage_entry_id, stage_id, entry_id, tournament_id, group_id, status)
+  values
+    ('5e000000-0000-0000-0000-000000000008', '50000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000001', 'active'),
+    ('5e000000-0000-0000-0000-000000000009', '50000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000001', 'active'),
+    ('5e000000-0000-0000-0000-000000000010', '50000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000010', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000002', 'active'),
+    ('5e000000-0000-0000-0000-000000000011', '50000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000002', 'active')
+  on conflict (stage_entry_id) do nothing;
+
+  -- Stage 1 Rounds
+  insert into public.tournament_rounds (round_id, stage_id, tournament_id, group_id, round_number, label)
+  values
+    ('60000000-0000-0000-0000-000000000006', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000001', 1, 'Group A Match'),
+    ('60000000-0000-0000-0000-000000000007', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', '55000000-0000-0000-0000-000000000002', 1, 'Group B Match')
+  on conflict (round_id) do nothing;
+
+  -- Stage 1 Draw Revision
+  insert into public.tournament_draw_revisions (
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+  ) values (
+    '65000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003',
+    1, 'published', 1, '{"fixtures_count": 2}'::jsonb
+  ) on conflict (draw_revision_id) do nothing;
+
+  -- Stage 1 Fixtures
+  insert into public.tournament_fixtures (fixture_id, tournament_id, stage_id, round_id, draw_revision_id, fixture_number, state)
+  values
+    ('70000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', '60000000-0000-0000-0000-000000000006', '65000000-0000-0000-0000-000000000003', 1, 'ready'),
+    ('70000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', '60000000-0000-0000-0000-000000000007', '65000000-0000-0000-0000-000000000003', 1, 'ready')
+  on conflict (fixture_id) do nothing;
+
+  -- Stage 1 Fixture Slots
+  insert into public.tournament_fixture_slots (fixture_id, tournament_id, stage_id, side, source_type, source_entry_id)
+  values
+    ('70000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'A', 'entry', 'e0000000-0000-0000-0000-000000000008'),
+    ('70000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'B', 'entry', 'e0000000-0000-0000-0000-000000000009'),
+    ('70000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'A', 'entry', 'e0000000-0000-0000-0000-000000000010'),
+    ('70000000-0000-0000-0000-000000000008', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000003', 'B', 'entry', 'e0000000-0000-0000-0000-000000000011')
+  on conflict (fixture_id, side) do nothing;
+
+  -- Stage 2: Playoffs (Elimination)
+  insert into public.tournament_stages (stage_id, tournament_id, sequence, name, competition_format, state)
+  values ('50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003', 2, 'Playoffs', 'single_elimination', 'pending')
+  on conflict (stage_id) do nothing;
+
+  -- Stage 2 Rounds
+  insert into public.tournament_rounds (round_id, stage_id, tournament_id, round_number, label)
+  values ('60000000-0000-0000-0000-000000000008', '50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003', 1, 'Final')
+  on conflict (round_id) do nothing;
+
+  -- Stage 2 Draw Revision
+  insert into public.tournament_draw_revisions (
+    draw_revision_id, stage_id, tournament_id, revision_number, status, based_on_entry_revision, plan_snapshot
+  ) values (
+    '65000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000003',
+    1, 'published', 1, '{"fixtures_count": 1}'::jsonb
+  ) on conflict (draw_revision_id) do nothing;
+
+  -- Stage 2 Fixtures
+  insert into public.tournament_fixtures (fixture_id, tournament_id, stage_id, round_id, draw_revision_id, fixture_number, state)
+  values ('70000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000004', '60000000-0000-0000-0000-000000000008', '65000000-0000-0000-0000-000000000004', 1, 'unresolved')
+  on conflict (fixture_id) do nothing;
+
+  -- Stage 2 Fixture Slots (GROUP_RANK symbolic sources)
+  insert into public.tournament_fixture_slots (fixture_id, tournament_id, stage_id, side, source_type, source_group_id, source_rank)
+  values
+    ('70000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000004', 'A', 'group_rank', '55000000-0000-0000-0000-000000000001', 1),
+    ('70000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000004', 'B', 'group_rank', '55000000-0000-0000-0000-000000000002', 1)
+  on conflict (fixture_id, side) do nothing;
+
+  raise notice 'Canonical tournament structure seeded successfully (Single Elimination, Round Robin, Group+Knockout).';
+end $seed_tournaments$;
 
 -- =============================================================================
 -- CLEANUP — paste into the SQL editor when you want to remove the seed

@@ -1,92 +1,93 @@
-import '../../../matches/domain/entities/match.dart';
-import '../../../teams/domain/entities/team.dart';
+import '../../domain/entities/tournament_fixture.dart';
 
-/// Wire-format DTO for a match row belonging to a tournament.
+/// Wire-format DTO for `public.tournament_fixtures` rows.
 class TournamentFixtureDto {
   const TournamentFixtureDto({
-    required this.matchId,
-    required this.teamAId,
-    required this.teamBId,
-    required this.status,
-    required this.createdAt,
-    this.venue,
+    required this.fixtureId,
+    required this.tournamentId,
+    required this.stageId,
+    required this.roundId,
+    required this.drawRevisionId,
+    required this.fixtureNumber,
+    required this.state,
     this.scheduledStartTime,
-    this.actualStartTime,
-    this.round,
-    this.bracketRoundNumber,
-    this.bracketMatchNumber,
-    this.prevMatchAId,
-    this.prevMatchBId,
-    this.format = const {},
-    this.createdBy,
+    this.venueId,
+    this.venueNameFallback,
+    this.competitionConfigOverride = const {},
+    this.sportRulesOverride = const {},
+    required this.createdAt,
+    required this.updatedAt,
   });
 
-  final String matchId;
-  final String teamAId;
-  final String teamBId;
-  final String status;
-  final String? venue;
+  final String fixtureId;
+  final String tournamentId;
+  final String stageId;
+  final String roundId;
+  final String drawRevisionId;
+  final int fixtureNumber;
+  final String state;
   final String? scheduledStartTime;
-  final String? actualStartTime;
-  final String? round;
-  final int? bracketRoundNumber;
-  final int? bracketMatchNumber;
-  final String? prevMatchAId;
-  final String? prevMatchBId;
-  final Map<String, dynamic> format;
-  final String? createdBy;
+  final String? venueId;
+  final String? venueNameFallback;
+  final Map<String, dynamic> competitionConfigOverride;
+  final Map<String, dynamic> sportRulesOverride;
   final String createdAt;
+  final String updatedAt;
 
   factory TournamentFixtureDto.fromJson(Map<String, dynamic> json) {
     return TournamentFixtureDto(
-      matchId: (json['match_id'] ?? json['id'] ?? '').toString(),
-      teamAId: (json['team_a_id'] ?? '').toString(),
-      teamBId: (json['team_b_id'] ?? '').toString(),
-      status: json['status'] as String? ?? 'scheduled',
-      venue: json['venue'] as String?,
+      fixtureId: json['fixture_id'] as String,
+      tournamentId: json['tournament_id'] as String,
+      stageId: json['stage_id'] as String,
+      roundId: json['round_id'] as String,
+      drawRevisionId: json['draw_revision_id'] as String,
+      fixtureNumber: json['fixture_number'] as int? ?? 1,
+      state: json['state'] as String? ?? 'unresolved',
       scheduledStartTime: json['scheduled_start_time'] as String?,
-      actualStartTime: json['actual_start_time'] as String?,
-      round: json['round'] as String?,
-      bracketRoundNumber: json['bracket_round_number'] as int?,
-      bracketMatchNumber: json['bracket_match_number'] as int?,
-      prevMatchAId: json['prev_match_a_id'] as String?,
-      prevMatchBId: json['prev_match_b_id'] as String?,
-      format: (json['format'] as Map<String, dynamic>?) ??
-          (json['rules_config'] as Map<String, dynamic>?) ??
-          const {},
-      createdBy: json['created_by'] as String?,
-      createdAt: json['created_at'] as String? ??
-          DateTime.now().toIso8601String(),
+      venueId: json['venue_id'] as String?,
+      venueNameFallback: json['venue_name_fallback'] as String?,
+      competitionConfigOverride: (json['competition_config_override'] as Map<String, dynamic>?) ?? const {},
+      sportRulesOverride: (json['sport_rules_override'] as Map<String, dynamic>?) ?? const {},
+      createdAt: json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+      updatedAt: json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
     );
   }
 
-  Match toEntity() {
-    DateTime? parseDate(String? s) => s == null ? null : DateTime.tryParse(s);
+  Map<String, dynamic> toJson() {
+    return {
+      'fixture_id': fixtureId,
+      'tournament_id': tournamentId,
+      'stage_id': stageId,
+      'round_id': roundId,
+      'draw_revision_id': drawRevisionId,
+      'fixture_number': fixtureNumber,
+      'state': state,
+      'scheduled_start_time': scheduledStartTime,
+      'venue_id': venueId,
+      'venue_name_fallback': venueNameFallback,
+      'competition_config_override': competitionConfigOverride,
+      'sport_rules_override': sportRulesOverride,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+    };
+  }
 
-    return Match(
-      id: MatchId(matchId),
-      teamAId: TeamId(teamAId),
-      teamBId: TeamId(teamBId),
-      venue: venue != null ? Venue(ground: venue!) : null,
-      scheduledStartTime: parseDate(scheduledStartTime),
-      actualStartTime: parseDate(actualStartTime),
-      round: round,
-      bracketRoundNumber: bracketRoundNumber,
-      bracketMatchNumber: bracketMatchNumber,
-      prevMatchAId: prevMatchAId,
-      prevMatchBId: prevMatchBId,
-      status: MatchStatus.fromWire(status),
-      matchType: MatchType.tournament,
-      format: MatchFormat(
-        oversPerInnings: (format['max_overs'] as num?)?.toInt() ??
-            (format['overs_per_innings'] as num?)?.toInt() ??
-            20,
-        playersPerTeam: (format['players_per_team'] as num?)?.toInt() ?? 11,
-        ballType: MatchBallType.fromWire(format['ball_type'] as String?),
-        maxOversPerBowler: (format['max_overs_per_bowler'] as num?)?.toInt() ?? 4,
-      ),
-      createdBy: createdBy ?? '',
+  TournamentFixture toEntity() {
+    return TournamentFixture(
+      fixtureId: fixtureId,
+      tournamentId: tournamentId,
+      stageId: stageId,
+      roundId: roundId,
+      drawRevisionId: drawRevisionId,
+      fixtureNumber: fixtureNumber,
+      state: TournamentFixtureState.fromWire(state),
+      scheduledStartTime: scheduledStartTime != null ? DateTime.tryParse(scheduledStartTime!) : null,
+      venueId: venueId,
+      venueNameFallback: venueNameFallback,
+      competitionConfigOverride: competitionConfigOverride,
+      sportRulesOverride: sportRulesOverride,
       createdAt: DateTime.parse(createdAt),
+      updatedAt: DateTime.parse(updatedAt),
     );
   }
 }

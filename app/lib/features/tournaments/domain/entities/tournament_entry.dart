@@ -38,6 +38,7 @@ class TournamentEntry extends Equatable {
     required this.status,
     required this.entrySource,
     required this.squadState,
+    this.squadRevision = 1,
     required this.createdAt,
     required this.updatedAt,
     this.registrationId,
@@ -58,6 +59,15 @@ class TournamentEntry extends Equatable {
   final TournamentEntryStatus status;
   final String entrySource;
   final TournamentSquadState squadState;
+
+  /// Optimistic-concurrency revision for this Entry's accepted squad.
+  ///
+  /// This revision is completely separate from:
+  ///
+  /// - Tournament.revision
+  /// - Tournament.entryRevision
+  final int squadRevision;
+
   final String? registrationId;
   final String? acceptedBy;
   final DateTime? acceptedAt;
@@ -80,21 +90,22 @@ class TournamentEntry extends Equatable {
 
   @override
   List<Object?> get props => [
-        entryId,
-        tournamentId,
-        teamId,
-        status,
-        entrySource,
-        squadState,
-        registrationId,
-        acceptedBy,
-        acceptedAt,
-        withdrawnAt,
-        withdrawalReason,
-        disqualifiedAt,
-        disqualificationReason,
-        squadFrozenAt,
-        createdAt,
-        updatedAt,
-      ];
+    entryId,
+    tournamentId,
+    teamId,
+    status,
+    entrySource,
+    squadState,
+    squadRevision,
+    registrationId,
+    acceptedBy,
+    acceptedAt,
+    withdrawnAt,
+    withdrawalReason,
+    disqualifiedAt,
+    disqualificationReason,
+    squadFrozenAt,
+    createdAt,
+    updatedAt,
+  ];
 }

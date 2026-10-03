@@ -14,6 +14,7 @@ class TournamentDto {
     this.ownerUserId,
     this.createdBy,
     this.revision = 1,
+    this.entryRevision = 1,
     this.publicationState = 'draft',
     this.registrationState = 'not_open',
     this.entryState = 'editable',
@@ -43,6 +44,7 @@ class TournamentDto {
   final String? ownerUserId;
   final String? createdBy;
   final int revision;
+  final int entryRevision;
   final String publicationState;
   final String registrationState;
   final String entryState;
@@ -76,13 +78,18 @@ class TournamentDto {
 
     return TournamentDto(
       tournamentId: json['tournament_id'] as String,
-      tournamentName: json['tournament_name'] as String? ?? 'Untitled Tournament',
+      tournamentName:
+          json['tournament_name'] as String? ?? 'Untitled Tournament',
       tournamentType: json['tournament_type'] as String? ?? 'knockout',
       status: derivedStatus,
       privacy: json['privacy'] as String? ?? 'public',
-      ownerUserId: json['owner_user_id'] as String? ?? json['created_by'] as String?,
+      ownerUserId:
+          json['owner_user_id'] as String? ?? json['created_by'] as String?,
       createdBy: json['created_by'] as String?,
       revision: (json['revision'] as num?)?.toInt() ?? 1,
+      // entry_revision is canonical concurrency state.
+      // Do not derive it from updated_at or from the general Tournament revision.
+      entryRevision: (json['entry_revision'] as num).toInt(),
       publicationState: pub,
       registrationState: reg,
       entryState: json['entry_state'] as String? ?? 'editable',
@@ -103,8 +110,10 @@ class TournamentDto {
       maxTeams: json['max_teams'] as int?,
       awards: (json['awards'] as Map<String, dynamic>?) ?? const {},
       approvedTeamsCount: (json['approved_teams_count'] as num?)?.toInt() ?? 0,
-      createdAt: json['created_at'] as String? ?? DateTime.now().toIso8601String(),
-      updatedAt: json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
+      createdAt:
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+      updatedAt:
+          json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
     );
   }
 
@@ -124,12 +133,13 @@ class TournamentDto {
   Tournament toEntity() {
     DateTime? parseDate(String? d) => d == null ? null : DateTime.tryParse(d);
 
-    final venueObjects = venues.map((v) {
-      if (v is Map<String, dynamic>) {
-        return TournamentVenue.fromJson(v);
-      }
-      return TournamentVenue(name: v.toString());
-    }).toList();
+    final venueObjects =
+        venues.map((v) {
+          if (v is Map<String, dynamic>) {
+            return TournamentVenue.fromJson(v);
+          }
+          return TournamentVenue(name: v.toString());
+        }).toList();
 
     return Tournament(
       id: tournamentId,
@@ -140,8 +150,11 @@ class TournamentDto {
       ownerUserId: ownerUserId,
       createdBy: createdBy,
       revision: revision,
+      entryRevision: entryRevision,
       publicationState: TournamentPublicationState.fromWire(publicationState),
-      registrationState: TournamentRegistrationState.fromWire(registrationState),
+      registrationState: TournamentRegistrationState.fromWire(
+        registrationState,
+      ),
       entryState: TournamentEntryState.fromWire(entryState),
       competitionState: TournamentCompetitionState.fromWire(competitionState),
       terminationState: TournamentTerminationState.fromWire(terminationState),

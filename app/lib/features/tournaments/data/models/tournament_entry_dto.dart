@@ -9,6 +9,7 @@ class TournamentEntryDto {
     required this.status,
     required this.entrySource,
     required this.squadState,
+    this.squadRevision = 1,
     required this.createdAt,
     required this.updatedAt,
     this.registrationId,
@@ -29,6 +30,7 @@ class TournamentEntryDto {
   final String status;
   final String entrySource;
   final String squadState;
+  final int squadRevision;
   final String? registrationId;
   final String? acceptedBy;
   final String? acceptedAt;
@@ -51,6 +53,9 @@ class TournamentEntryDto {
       status: json['status'] as String? ?? 'active',
       entrySource: json['entry_source'] as String? ?? 'application',
       squadState: json['squad_state'] as String? ?? 'editable',
+      // This is canonical optimistic-concurrency state.
+      // Missing squad_revision is a broken read contract.
+      squadRevision: (json['squad_revision'] as num).toInt(),
       registrationId: json['registration_id'] as String?,
       acceptedBy: json['accepted_by'] as String?,
       acceptedAt: json['accepted_at'] as String?,
@@ -59,33 +64,36 @@ class TournamentEntryDto {
       disqualifiedAt: json['disqualified_at'] as String?,
       disqualificationReason: json['disqualification_reason'] as String?,
       squadFrozenAt: json['squad_frozen_at'] as String?,
-      createdAt: json['created_at'] as String? ?? DateTime.now().toIso8601String(),
-      updatedAt: json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
+      createdAt:
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+      updatedAt:
+          json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
       teamName: teamJson?['team_name'] as String?,
       teamLogoUrl: teamJson?['logo_url'] as String?,
     );
   }
 
   TournamentEntry toEntity() => TournamentEntry(
-        entryId: entryId,
-        tournamentId: tournamentId,
-        teamId: teamId,
-        status: TournamentEntryStatus.fromWire(status),
-        entrySource: entrySource,
-        squadState: TournamentSquadState.fromWire(squadState),
-        registrationId: registrationId,
-        acceptedBy: acceptedBy,
-        acceptedAt: acceptedAt != null ? DateTime.parse(acceptedAt!) : null,
-        withdrawnAt: withdrawnAt != null ? DateTime.parse(withdrawnAt!) : null,
-        withdrawalReason: withdrawalReason,
-        disqualifiedAt:
-            disqualifiedAt != null ? DateTime.parse(disqualifiedAt!) : null,
-        disqualificationReason: disqualificationReason,
-        squadFrozenAt:
-            squadFrozenAt != null ? DateTime.parse(squadFrozenAt!) : null,
-        createdAt: DateTime.parse(createdAt),
-        updatedAt: DateTime.parse(updatedAt),
-        teamName: teamName,
-        teamLogoUrl: teamLogoUrl,
-      );
+    entryId: entryId,
+    tournamentId: tournamentId,
+    teamId: teamId,
+    status: TournamentEntryStatus.fromWire(status),
+    entrySource: entrySource,
+    squadState: TournamentSquadState.fromWire(squadState),
+    squadRevision: squadRevision,
+    registrationId: registrationId,
+    acceptedBy: acceptedBy,
+    acceptedAt: acceptedAt != null ? DateTime.parse(acceptedAt!) : null,
+    withdrawnAt: withdrawnAt != null ? DateTime.parse(withdrawnAt!) : null,
+    withdrawalReason: withdrawalReason,
+    disqualifiedAt:
+        disqualifiedAt != null ? DateTime.parse(disqualifiedAt!) : null,
+    disqualificationReason: disqualificationReason,
+    squadFrozenAt:
+        squadFrozenAt != null ? DateTime.parse(squadFrozenAt!) : null,
+    createdAt: DateTime.parse(createdAt),
+    updatedAt: DateTime.parse(updatedAt),
+    teamName: teamName,
+    teamLogoUrl: teamLogoUrl,
+  );
 }

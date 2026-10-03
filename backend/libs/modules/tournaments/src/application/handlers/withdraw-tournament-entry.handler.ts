@@ -75,11 +75,24 @@ export class WithdrawTournamentEntryHandler
       withdrawalReason: command.payload.reason,
     });
 
-    // 9. Read actual resulting tournaments.entry_revision (Requirement 20)
-    const updatedTournament = await this.rootRepo.findTournament(tx, tournamentId);
-    const entryRevision = updatedTournament
-      ? updatedTournament.entryRevision
-      : tournament.entryRevision + 1;
+    // 9. Read the authoritative resulting tournaments.entry_revision.
+    //
+    // Never predict this as previousRevision + 1. PostgreSQL owns Entry Set
+    // revision changes, so the command response must use the value persisted by
+    // the database trigger.
+    const updatedTournament = await this.rootRepo.findTournament(
+      tx,
+      tournamentId,
+    );
+    if (!updatedTournament) {
+      // The Tournament was already locked earlier in this transaction, so this
+      // should be impossible unless a database invariant is broken.
+      throw TournamentError.notFound(
+        `Tournament ${tournamentId} disappeared while withdrawing entry ${entryId}`,
+        { tournamentId, entryId },
+      );
+    }
+    const entryRevision = updatedTournament.entryRevision;
 
     return {
       entryId: withdrawn.entryId,

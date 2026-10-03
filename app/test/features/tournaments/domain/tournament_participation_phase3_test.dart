@@ -10,7 +10,6 @@ import 'package:matchday/features/tournaments/domain/entities/tournament_squad_m
 void main() {
   group('Phase 3 — Frozen Domain Separation Invariants', () {
     test('1. Registration != Entry != Squad != Match Lineup != Payment', () {
-
       // Registration is an application request
       final reg = TournamentRegistration(
         registrationId: 'reg-001',
@@ -113,7 +112,10 @@ void main() {
         createdAt: DateTime(2026, 9, 20),
         updatedAt: DateTime(2026, 9, 21),
       );
-      expect(withdrawnApp.status, equals(TournamentRegistrationStatus.withdrawn));
+      expect(
+        withdrawnApp.status,
+        equals(TournamentRegistrationStatus.withdrawn),
+      );
       expect(withdrawnApp.isApproved, isFalse);
 
       // B. Post-approval competitive Entry withdrawal
@@ -145,40 +147,46 @@ void main() {
       );
 
       // Registration remains approved historically!
-      expect(historicalApprovedApp.status, equals(TournamentRegistrationStatus.approved));
+      expect(
+        historicalApprovedApp.status,
+        equals(TournamentRegistrationStatus.approved),
+      );
       // Entry is withdrawn
       expect(withdrawnEntry.status, equals(TournamentEntryStatus.withdrawn));
       expect(withdrawnEntry.isWithdrawn, isTrue);
     });
 
-    test('4. Squad State (Editable vs Frozen) is independent from Entry Set Lock', () {
-      final entryEditable = TournamentEntry(
-        entryId: 'entry-005',
-        tournamentId: 't-001',
-        teamId: 'team-005',
-        status: TournamentEntryStatus.active,
-        entrySource: 'application',
-        squadState: TournamentSquadState.editable,
-        createdAt: DateTime(2026, 10, 1),
-        updatedAt: DateTime(2026, 10, 1),
-      );
+    test(
+      '4. Squad State (Editable vs Frozen) is independent from Entry Set Lock',
+      () {
+        final entryEditable = TournamentEntry(
+          entryId: 'entry-005',
+          tournamentId: 't-001',
+          teamId: 'team-005',
+          status: TournamentEntryStatus.active,
+          entrySource: 'application',
+          squadState: TournamentSquadState.editable,
+          createdAt: DateTime(2026, 10, 1),
+          updatedAt: DateTime(2026, 10, 1),
+        );
 
-      final entryFrozen = TournamentEntry(
-        entryId: 'entry-005',
-        tournamentId: 't-001',
-        teamId: 'team-005',
-        status: TournamentEntryStatus.active,
-        entrySource: 'application',
-        squadState: TournamentSquadState.frozen,
-        squadFrozenAt: DateTime(2026, 10, 1, 12, 0),
-        createdAt: DateTime(2026, 10, 1),
-        updatedAt: DateTime(2026, 10, 1, 12, 0),
-      );
+        final entryFrozen = TournamentEntry(
+          entryId: 'entry-005',
+          tournamentId: 't-001',
+          teamId: 'team-005',
+          status: TournamentEntryStatus.active,
+          entrySource: 'application',
+          squadState: TournamentSquadState.frozen,
+          squadFrozenAt: DateTime(2026, 10, 1, 12, 0),
+          createdAt: DateTime(2026, 10, 1),
+          updatedAt: DateTime(2026, 10, 1, 12, 0),
+        );
 
-      expect(entryEditable.isSquadFrozen, isFalse);
-      expect(entryFrozen.isSquadFrozen, isTrue);
-      expect(entryFrozen.squadFrozenAt, isNotNull);
-    });
+        expect(entryEditable.isSquadFrozen, isFalse);
+        expect(entryFrozen.isSquadFrozen, isTrue);
+        expect(entryFrozen.squadFrozenAt, isNotNull);
+      },
+    );
   });
 
   group('Phase 3 — DTO Parsing & Entity Mapping', () {
@@ -191,6 +199,7 @@ void main() {
         'status': 'active',
         'entry_source': 'application',
         'squad_state': 'editable',
+        'squad_revision': 2,
         'accepted_by': 'u-org',
         'accepted_at': '2026-10-01T00:00:00.000Z',
         'created_at': '2026-10-01T00:00:00.000Z',
@@ -204,6 +213,7 @@ void main() {
       final dto = TournamentEntryDto.fromJson(json);
       expect(dto.entryId, equals('e-100'));
       expect(dto.teamName, equals('Lahore Qalandars'));
+      expect(dto.squadRevision, equals(2));
 
       final entity = dto.toEntity();
       expect(entity.entryId, equals('e-100'));
@@ -212,6 +222,7 @@ void main() {
       expect(entity.registrationId, equals('r-100'));
       expect(entity.status, equals(TournamentEntryStatus.active));
       expect(entity.squadState, equals(TournamentSquadState.editable));
+      expect(entity.squadRevision, equals(2));
       expect(entity.teamName, equals('Lahore Qalandars'));
       expect(entity.teamLogoUrl, equals('https://example.com/logo.png'));
     });
@@ -240,7 +251,10 @@ void main() {
       final entity = dto.toEntity();
       expect(entity.squadMemberId, equals('sq-200'));
       expect(entity.userId, equals('u-player'));
-      expect(entity.membershipStatus, equals(TournamentSquadMembershipStatus.active));
+      expect(
+        entity.membershipStatus,
+        equals(TournamentSquadMembershipStatus.active),
+      );
       expect(entity.displayName, equals('Babar Azam'));
       expect(entity.username, equals('babar_azam'));
       expect(entity.avatarUrl, equals('https://example.com/babar.png'));

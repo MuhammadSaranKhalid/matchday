@@ -3,10 +3,22 @@ import 'package:meta/meta.dart';
 /// Supported tournament types.
 enum TournamentType {
   knockout('knockout', 'Knockout', 'Single elimination bracket tree'),
-  roundRobin('round_robin', 'Round Robin', 'Every team plays every other team once'),
+  roundRobin(
+    'round_robin',
+    'Round Robin',
+    'Every team plays every other team once',
+  ),
   league('league', 'League', 'Points table with qualification playoffs'),
-  groupKnockout('group_knockout', 'Group + Knockout', 'Group stages feeding knockout tree'),
-  doubleElimination('double_elimination', 'Double Elimination', 'Winners & Losers bracket');
+  groupKnockout(
+    'group_knockout',
+    'Group + Knockout',
+    'Group stages feeding knockout tree',
+  ),
+  doubleElimination(
+    'double_elimination',
+    'Double Elimination',
+    'Winners & Losers bracket',
+  );
 
   const TournamentType(this.wire, this.label, this.description);
   final String wire;
@@ -14,7 +26,8 @@ enum TournamentType {
   final String description;
 
   static TournamentType fromWire(String? wire) =>
-      values.where((t) => t.wire == wire).firstOrNull ?? TournamentType.knockout;
+      values.where((t) => t.wire == wire).firstOrNull ??
+      TournamentType.knockout;
 }
 
 /// Tournament lifecycle status.
@@ -118,29 +131,28 @@ enum TournamentPrivacy {
   final String label;
 
   static TournamentPrivacy fromWire(String? wire) =>
-      values.where((p) => p.wire == wire).firstOrNull ?? TournamentPrivacy.public;
+      values.where((p) => p.wire == wire).firstOrNull ??
+      TournamentPrivacy.public;
 }
 
 /// A cricket venue used in a tournament.
 @immutable
 class TournamentVenue {
-  const TournamentVenue({
-    required this.name,
-    this.city,
-  });
+  const TournamentVenue({required this.name, this.city});
 
   final String name;
   final String? city;
 
-  factory TournamentVenue.fromJson(Map<String, dynamic> json) => TournamentVenue(
+  factory TournamentVenue.fromJson(Map<String, dynamic> json) =>
+      TournamentVenue(
         name: json['name'] as String? ?? 'Main Ground',
         city: json['city'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        if (city != null) 'city': city,
-      };
+    'name': name,
+    if (city != null) 'city': city,
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -166,6 +178,7 @@ class Tournament {
     this.ownerUserId,
     this.createdBy,
     this.revision = 1,
+    this.entryRevision = 1,
     this.publicationState = TournamentPublicationState.draft,
     this.registrationState = TournamentRegistrationState.notOpen,
     this.entryState = TournamentEntryState.editable,
@@ -195,11 +208,24 @@ class Tournament {
   final TournamentType type;
   final TournamentStatus status;
   final TournamentPrivacy privacy;
+
   /// Canonical authority root for the tournament.
   final String? ownerUserId;
+
   /// Historical creator provenance (who originally inserted the record).
   final String? createdBy;
+
+  /// General Tournament aggregate revision.
+  ///
+  /// This is distinct from [entryRevision].
   final int revision;
+
+  /// Revision of the accepted competitive Entry Set.
+  ///
+  /// Incremented by PostgreSQL when the Tournament's active Entry Set changes.
+  /// Used for optimistic concurrency on Entry-set commands such as withdrawal.
+  final int entryRevision;
+
   final TournamentPublicationState publicationState;
   final TournamentRegistrationState registrationState;
   final TournamentEntryState entryState;
@@ -258,12 +284,12 @@ class Tournament {
   }
 
   TournamentStatus get projectedPublicStatus => derivePublicStatus(
-        publicationState: publicationState,
-        registrationState: registrationState,
-        entryState: entryState,
-        competitionState: competitionState,
-        terminationState: terminationState,
-      );
+    publicationState: publicationState,
+    registrationState: registrationState,
+    entryState: entryState,
+    competitionState: competitionState,
+    terminationState: terminationState,
+  );
 
   /// Authority check: answers whether [userId] currently has root owner
   /// or delegated organizer authority over this tournament.
@@ -292,6 +318,8 @@ class Tournament {
           other.type == type &&
           other.status == status &&
           other.privacy == privacy &&
+          other.revision == revision &&
+          other.entryRevision == entryRevision &&
           other.createdBy == createdBy &&
           other.bannerImageUrl == bannerImageUrl &&
           other.logoUrl == logoUrl &&
@@ -307,18 +335,20 @@ class Tournament {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        name,
-        type,
-        status,
-        privacy,
-        createdBy,
-        bannerImageUrl,
-        logoUrl,
-        startDate,
-        endDate,
-        city,
-        entryFee,
-        approvedTeamsCount,
-      );
+    id,
+    name,
+    type,
+    status,
+    privacy,
+    revision,
+    entryRevision,
+    createdBy,
+    bannerImageUrl,
+    logoUrl,
+    startDate,
+    endDate,
+    city,
+    entryFee,
+    approvedTeamsCount,
+  );
 }

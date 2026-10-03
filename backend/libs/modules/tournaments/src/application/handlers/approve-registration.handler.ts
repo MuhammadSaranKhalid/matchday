@@ -138,11 +138,18 @@ export class ApproveRegistrationHandler
       });
     }
 
-    // 12. Query actual resulting entry_revision from DB trigger (Requirement 15)
-    const updatedTournament = await this.rootRepo.findTournament(tx, tournamentId);
-    const entryRevision = updatedTournament
-      ? updatedTournament.entryRevision
-      : tournament.entryRevision + 1;
+    // 12. Read authoritative resulting entry_revision from DB trigger (Requirement 15)
+    const updatedTournament = await this.rootRepo.findTournament(
+      tx,
+      tournamentId,
+    );
+    if (!updatedTournament) {
+      throw TournamentError.notFound(
+        `Tournament ${tournamentId} disappeared while approving registration ${registrationId}`,
+        { tournamentId, registrationId },
+      );
+    }
+    const entryRevision = updatedTournament.entryRevision;
 
     return {
       registrationId,

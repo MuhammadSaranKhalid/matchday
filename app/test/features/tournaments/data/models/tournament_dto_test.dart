@@ -13,7 +13,7 @@ void main() {
         'privacy': 'public',
         'created_by': 'user-1',
         'venues': [
-          {'name': 'Model Town Ground', 'city': 'Lahore'}
+          {'name': 'Model Town Ground', 'city': 'Lahore'},
         ],
         'format': {'max_overs': 10, 'ball_type': 'Tape Ball'},
         'rules': {'min_squad': 11},
@@ -24,6 +24,7 @@ void main() {
         'min_teams': 4,
         'max_teams': 8,
         'approved_teams_count': 6,
+        'entry_revision': 1,
         'created_at': '2026-08-25T12:00:00Z',
         'updated_at': '2026-08-25T12:00:00Z',
       };
@@ -32,6 +33,7 @@ void main() {
       final entity = dto.toEntity();
 
       expect(entity.id, equals('tourn-123'));
+      expect(entity.entryRevision, equals(1));
       expect(entity.name, equals('Ramadan Night Cup'));
       expect(entity.type, equals(TournamentType.knockout));
       expect(entity.status, equals(TournamentStatus.registration));

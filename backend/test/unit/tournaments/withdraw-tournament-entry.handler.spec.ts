@@ -158,6 +158,22 @@ describe('WithdrawTournamentEntryHandler', () => {
     expect(rootRepo.findTournament).toHaveBeenCalledWith(tx, tournamentId);
   });
 
+  it('never predicts entryRevision when the authoritative Tournament cannot be re-read', async () => {
+    rootRepo.findTournament.mockResolvedValueOnce(null);
+    try {
+      await handler.execute(context, {
+        ...command,
+        expectedRevision: 2,
+      });
+      expect.fail('Should have thrown instead of predicting entryRevision');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.NOT_FOUND,
+      );
+    }
+  });
+
   it('fails if entry is not active', async () => {
     entryRepo.lockEntry.mockResolvedValueOnce({
       entryId,

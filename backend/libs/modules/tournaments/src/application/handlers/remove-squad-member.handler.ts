@@ -12,13 +12,12 @@ import type {
 } from '../../domain/command/participation-commands.js';
 
 export class RemoveSquadMemberHandler
-  implements TournamentCommandHandler<RemoveSquadMemberCommand, RemoveSquadMemberResult>
-{
+  implements TournamentCommandHandler<RemoveSquadMemberCommand, RemoveSquadMemberResult> {
   constructor(
     private readonly teamAuthRepo: TeamAuthorizationRepository,
     private readonly entryRepo: TournamentEntryRepository,
     private readonly squadRepo: TournamentSquadRepository,
-  ) {}
+  ) { }
 
   async execute(
     context: TournamentCommandContext,
@@ -61,13 +60,13 @@ export class RemoveSquadMemberHandler
     }
 
     // 6. // Phase 6 v1 authority:
-// current Team tournament-entry authority also owns editable squad changes.
-// A distinct Team squad capability may be introduced later.
-await this.teamAuthRepo.require(
-  tx,
-  entry.teamId,
-  'team.tournament.enter',
-);
+    // current Team tournament-entry authority also owns editable squad changes.
+    // A distinct Team squad capability may be introduced later.
+    await this.teamAuthRepo.require(
+      tx,
+      entry.teamId,
+      'team.tournament.enter',
+    );
     // 7. Soft-remove member (Requirement 22 & 26: do not DELETE)
     await this.squadRepo.removeSquadMember(tx, {
       squadMemberId,

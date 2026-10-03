@@ -23,17 +23,17 @@ import '../../domain/entities/tournament_squad_member.dart';
 import '../../domain/entities/tournament_standing.dart';
 import '../../domain/repositories/tournaments_repository.dart';
 import '../datasources/tournaments_remote_datasource.dart';
+import '../../domain/entities/tournament_squad_proposal_member.dart';
 
 /// Implementation of [TournamentsRepository] that translates all raw exceptions to [Failure]s.
 class TournamentsRepositoryImpl implements TournamentsRepository {
   TournamentsRepositoryImpl({required TournamentsRemoteDataSource remote})
-      : _remote = remote;
+    : _remote = remote;
 
   final TournamentsRemoteDataSource _remote;
 
   @override
-  Future<Either<Failure, Tournament>> getTournament(
-      String tournamentId) async {
+  Future<Either<Failure, Tournament>> getTournament(String tournamentId) async {
     try {
       final dto = await _remote.getTournament(tournamentId);
       return Right(dto.toEntity());
@@ -88,7 +88,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, Tournament>> createTournament(
-      CreateTournamentParams params) async {
+    CreateTournamentParams params,
+  ) async {
     try {
       final dto = await _remote.createTournament(params);
       return Right(dto.toEntity());
@@ -103,7 +104,9 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> updateTournament(
-      String tournamentId, Map<String, dynamic> updates) async {
+    String tournamentId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await _remote.updateTournament(tournamentId, updates);
       return const Right(null);
@@ -115,8 +118,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> publishTournament(
-      String tournamentId) async {
+  Future<Either<Failure, void>> publishTournament(String tournamentId) async {
     try {
       await _remote.publishTournament(tournamentId);
       return const Right(null);
@@ -129,7 +131,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> publishAndOpenRegistration(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       await _remote.publishAndOpenRegistration(tournamentId);
       return const Right(null);
@@ -142,7 +145,9 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> cancelTournament(
-      String tournamentId, String reason) async {
+    String tournamentId,
+    String reason,
+  ) async {
     try {
       await _remote.cancelTournament(tournamentId, reason);
       return const Right(null);
@@ -155,7 +160,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentRegistration>>>
-      getTournamentRegistrations(String tournamentId) async {
+  getTournamentRegistrations(String tournamentId) async {
     try {
       final dtos = await _remote.getTournamentRegistrations(tournamentId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -168,7 +173,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentParticipant>>>
-      getTournamentParticipants(String tournamentId) async {
+  getTournamentParticipants(String tournamentId) async {
     try {
       final dtos = await _remote.getTournamentParticipants(tournamentId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -183,16 +188,17 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   Future<Either<Failure, TournamentRegistration>> registerTeam({
     required String tournamentId,
     required String teamId,
-    required List<String> squadPlayerIds,
+    required List<TournamentSquadProposalMember> squadProposal,
     String? message,
   }) async {
     try {
       final dto = await _remote.registerTeam(
         tournamentId: tournamentId,
         teamId: teamId,
-        squadPlayerIds: squadPlayerIds,
+        squadProposal: squadProposal,
         message: message,
       );
+
       return Right(dto.toEntity());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
@@ -205,7 +211,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> approveRegistration(
-      String registrationId) async {
+    String registrationId,
+  ) async {
     try {
       await _remote.approveRegistration(registrationId);
       return const Right(null);
@@ -218,7 +225,9 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> rejectRegistration(
-      String registrationId, String reason) async {
+    String registrationId,
+    String reason,
+  ) async {
     try {
       await _remote.rejectRegistration(registrationId, reason);
       return const Right(null);
@@ -231,7 +240,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> withdrawPendingRegistration(
-      String registrationId) async {
+    String registrationId,
+  ) async {
     try {
       await _remote.withdrawPendingRegistration(registrationId);
       return const Right(null);
@@ -244,7 +254,9 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> withdrawEntry(
-      String entryId, {String? reason}) async {
+    String entryId, {
+    String? reason,
+  }) async {
     try {
       await _remote.withdrawEntry(entryId, reason: reason);
       return const Right(null);
@@ -255,11 +267,10 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     }
   }
 
-
-
   @override
   Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final dtos = await _remote.getTournamentEntries(tournamentId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -272,7 +283,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(
-      String entryId) async {
+    String entryId,
+  ) async {
     try {
       final dtos = await _remote.getEntrySquadMembers(entryId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -335,7 +347,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(
-      String entryId) async {
+    String entryId,
+  ) async {
     try {
       final dtos = await _remote.getEntryPayments(entryId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -346,12 +359,10 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     }
   }
 
-
-
-
   @override
   Future<Either<Failure, List<Match>>> getTournamentFixtures(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final fixtures = await _remote.getTournamentFixtures(tournamentId);
       return Right(fixtures);
@@ -364,7 +375,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentStanding>>> getStandings(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final dtos = await _remote.getStandings(tournamentId);
       return Right(
@@ -388,11 +400,10 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     });
   }
 
-
-
   @override
   Future<Either<Failure, TournamentAwards>> getSuggestedAwards(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final awards = await _remote.getSuggestedAwards(tournamentId);
       return Right(awards);
@@ -405,7 +416,9 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, void>> confirmAwards(
-      String tournamentId, TournamentAwards awards) async {
+    String tournamentId,
+    TournamentAwards awards,
+  ) async {
     try {
       await _remote.confirmAwards(tournamentId, awards);
       return const Right(null);
@@ -418,7 +431,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<MyTournamentEntry>>> getMyPlayingEntries(
-      List<String> teamIds) async {
+    List<String> teamIds,
+  ) async {
     if (teamIds.isEmpty) return const Right([]);
     try {
       final rows = await _remote.getMyRegistrations(teamIds);
@@ -528,7 +542,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<Ground>>> getTournamentGrounds(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       return Right(await _remote.getTournamentGrounds(tournamentId));
     } on ServerException catch (e) {
@@ -560,7 +575,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<TournamentLiveMatch>>> getLiveBoard(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final dtos = await _remote.getLiveBoard(tournamentId);
       return Right(dtos.map((d) => d.toEntity()).toList());
@@ -708,7 +724,8 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, List<ScorerCandidate>>> getScorerCandidates(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final people = await _remote.getScorerCandidates(tournamentId);
       return Right(people);
@@ -807,10 +824,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
     String? voidReason,
   }) async {
     try {
-      await _remote.voidPayment(
-        paymentId: paymentId,
-        voidReason: voidReason,
-      );
+      await _remote.voidPayment(paymentId: paymentId, voidReason: voidReason);
       return const Right(null);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));

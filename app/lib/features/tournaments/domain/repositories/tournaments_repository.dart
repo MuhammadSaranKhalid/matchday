@@ -20,6 +20,7 @@ import '../entities/tournament_participant.dart';
 import '../entities/tournament_registration.dart';
 import '../entities/tournament_squad_member.dart';
 import '../entities/tournament_standing.dart';
+import '../entities/tournament_squad_proposal_member.dart';
 
 /// The URLs stored after an artwork upload. Either may be null when only one
 /// image was supplied.
@@ -67,6 +68,7 @@ class CreateTournamentParams {
   final String? city;
   final double? latitude;
   final double? longitude;
+
   /// Legacy free-text venue list. Still written so older reads keep working;
   /// [groundIds] is the authoritative link.
   final List<TournamentVenue> venues;
@@ -109,23 +111,24 @@ abstract class TournamentsRepository {
 
   Future<Either<Failure, void>> publishAndOpenRegistration(String tournamentId);
 
-  Future<Either<Failure, void>> cancelTournament(String tournamentId, String reason);
+  Future<Either<Failure, void>> cancelTournament(
+    String tournamentId,
+    String reason,
+  );
 
   // Registrations & Participants
-  Future<Either<Failure, List<TournamentRegistration>>> getTournamentRegistrations(
-    String tournamentId,
-  );
+  Future<Either<Failure, List<TournamentRegistration>>>
+  getTournamentRegistrations(String tournamentId);
 
   /// Safe public read of accepted tournament participants derived strictly
   /// from tournament_entries + teams.
-  Future<Either<Failure, List<TournamentParticipant>>> getTournamentParticipants(
-    String tournamentId,
-  );
+  Future<Either<Failure, List<TournamentParticipant>>>
+  getTournamentParticipants(String tournamentId);
 
   Future<Either<Failure, TournamentRegistration>> registerTeam({
     required String tournamentId,
     required String teamId,
-    required List<String> squadPlayerIds,
+    required List<TournamentSquadProposalMember> squadProposal,
     String? message,
   });
 
@@ -137,16 +140,22 @@ abstract class TournamentsRepository {
   );
 
   /// Withdraws a pending registration application before it is accepted.
-  Future<Either<Failure, void>> withdrawPendingRegistration(String registrationId);
+  Future<Either<Failure, void>> withdrawPendingRegistration(
+    String registrationId,
+  );
 
   /// Withdraws an accepted Entry after approval.
   Future<Either<Failure, void>> withdrawEntry(String entryId, {String? reason});
 
   /// Canonical query for accepted entries in a tournament.
-  Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(String tournamentId);
+  Future<Either<Failure, List<TournamentEntry>>> getTournamentEntries(
+    String tournamentId,
+  );
 
   /// Canonical query for squad members of a tournament entry.
-  Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(String entryId);
+  Future<Either<Failure, List<TournamentSquadMember>>> getEntrySquadMembers(
+    String entryId,
+  );
 
   /// Adds a player (claimed or unclaimed) to a tournament entry squad.
   Future<Either<Failure, String>> addSquadMember({
@@ -165,7 +174,9 @@ abstract class TournamentsRepository {
   Future<Either<Failure, void>> freezeSquad(String entryId);
 
   /// Canonical query for payment ledger history of a tournament entry.
-  Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
+  Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(
+    String entryId,
+  );
 
   /// Voids a recorded payment receipt.
   Future<Either<Failure, void>> voidPayment({
@@ -183,8 +194,6 @@ abstract class TournamentsRepository {
   );
 
   Stream<List<TournamentStanding>> watchStandings(String tournamentId);
-
-
 
   // Awards
   Future<Either<Failure, TournamentAwards>> getSuggestedAwards(
@@ -320,7 +329,9 @@ abstract class TournamentsRepository {
 
   // ─── Match officials (artboard 27j) ─────────────────────────────────────────
 
-  Future<Either<Failure, List<MatchOfficial>>> getMatchOfficials(String matchId);
+  Future<Either<Failure, List<MatchOfficial>>> getMatchOfficials(
+    String matchId,
+  );
 
   Future<Either<Failure, List<OfficialCandidate>>> getOfficialCandidates({
     required String tournamentId,

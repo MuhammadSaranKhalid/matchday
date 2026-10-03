@@ -29,6 +29,7 @@ import '../models/tournament_participant_dto.dart';
 import '../models/tournament_registration_dto.dart';
 import '../models/tournament_squad_member_dto.dart';
 import '../models/tournament_standing_dto.dart';
+import '../../domain/entities/tournament_squad_proposal_member.dart';
 
 /// Direct PostgREST + Realtime client for Tournaments tables.
 /// Participation mutations are routed through the NestJS backend
@@ -38,7 +39,7 @@ class TournamentsRemoteDataSource {
     this._supabase, {
     this.backendBaseUrl = 'http://127.0.0.1:3000',
     http.Client? httpClient,
-  })  : _http = httpClient ?? http.Client();
+  }) : _http = httpClient ?? http.Client();
 
   final SupabaseClient _supabase;
   final http.Client _http;
@@ -72,10 +73,7 @@ class TournamentsRemoteDataSource {
     try {
       final res = await _supabase.functions.invoke(
         'cricket-match-action',
-        body: {
-          'action': action,
-          ...params,
-        },
+        body: {'action': action, ...params},
       );
 
       final data = res.data;
@@ -120,11 +118,12 @@ class TournamentsRemoteDataSource {
 
   Future<TournamentDto> getTournament(String tournamentId) async {
     try {
-      final response = await _supabase
-          .from(_tournamentsTable)
-          .select()
-          .eq('tournament_id', tournamentId)
-          .single();
+      final response =
+          await _supabase
+              .from(_tournamentsTable)
+              .select()
+              .eq('tournament_id', tournamentId)
+              .single();
 
       // Counted in its own round-trip rather than as an embedded aggregate.
       // The embed counted every registration regardless of status, so a cup
@@ -152,10 +151,11 @@ class TournamentsRemoteDataSource {
           .select('tournament_id')
           .eq('user_id', uid)
           .eq('status', 'active');
-      final memberTournamentIds = membershipRows
-          .map((r) => r['tournament_id'] as String?)
-          .whereType<String>()
-          .toList();
+      final memberTournamentIds =
+          membershipRows
+              .map((r) => r['tournament_id'] as String?)
+              .whereType<String>()
+              .toList();
 
       final List<Map<String, dynamic>> organizedRows;
       if (memberTournamentIds.isNotEmpty) {
@@ -180,10 +180,11 @@ class TournamentsRemoteDataSource {
           .eq('follower_id', uid)
           .eq('target_type', 'tournament');
 
-      final followedIds = followedRows
-          .map((r) => r['target_id'] as String?)
-          .whereType<String>()
-          .toList();
+      final followedIds =
+          followedRows
+              .map((r) => r['target_id'] as String?)
+              .whereType<String>()
+              .toList();
 
       List<Map<String, dynamic>> followedTournaments = [];
       if (followedIds.isNotEmpty) {
@@ -283,11 +284,12 @@ class TournamentsRemoteDataSource {
         if (params.logoUrl != null) 'logo_url': params.logoUrl,
       };
 
-      final response = await _supabase
-          .from(_tournamentsTable)
-          .insert(insertData)
-          .select()
-          .single();
+      final response =
+          await _supabase
+              .from(_tournamentsTable)
+              .insert(insertData)
+              .select()
+              .single();
 
       final dto = TournamentDto.fromJson(response);
 
@@ -305,7 +307,9 @@ class TournamentsRemoteDataSource {
   }
 
   Future<void> updateTournament(
-      String tournamentId, Map<String, dynamic> updates) async {
+    String tournamentId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await _supabase
           .from(_tournamentsTable)
@@ -323,9 +327,7 @@ class TournamentsRemoteDataSource {
     try {
       await _supabase
           .from(_tournamentsTable)
-          .update({
-            'publication_state': 'published',
-          })
+          .update({'publication_state': 'published'})
           .eq('tournament_id', tournamentId);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -367,7 +369,8 @@ class TournamentsRemoteDataSource {
   // ─── Registrations ────────────────────────────────────────────────────────
 
   Future<List<TournamentRegistrationDto>> getTournamentRegistrations(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final rows = await _supabase
           .from(_canonicalRegistrationsTable)
@@ -395,7 +398,8 @@ class TournamentsRemoteDataSource {
   /// Safe public read of accepted tournament participants derived strictly
   /// from tournament_entries + teams via security definer RPC.
   Future<List<TournamentParticipantDto>> getTournamentParticipants(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final rows = await _supabase.rpc<List<dynamic>>(
         'get_tournament_public_participants',
@@ -403,8 +407,11 @@ class TournamentsRemoteDataSource {
       );
 
       return rows
-          .map((row) => TournamentParticipantDto.fromJson(
-              Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => TournamentParticipantDto.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -414,31 +421,43 @@ class TournamentsRemoteDataSource {
   Future<TournamentRegistrationDto> registerTeam({
     required String tournamentId,
     required String teamId,
-    required List<String> squadPlayerIds,
+    required List<TournamentSquadProposalMember> squadProposal,
     String? message,
   }) async {
     _requireUid();
+
     final response = await _backend(
       '/api/v1/tournaments/$tournamentId/registrations',
       body: {
         'commandId': _uuid.v4(),
         'teamId': teamId,
-        'squadProposal': squadPlayerIds,
+        'squadProposal': [
+          for (final member in squadProposal)
+            if (member.userId != null)
+              {'userId': member.userId}
+            else
+              {'unclaimedId': member.unclaimedId},
+        ],
         if (message != null) 'message': message,
       },
     );
     // Backend returns { result: { registrationId, ... }, status: 'executed' };
     // re-fetch full DTO with team embed.
-    final result = response['result'] is Map<String, dynamic>
-        ? response['result'] as Map<String, dynamic>
-        : response;
-    final regId = (result['registrationId'] ?? response['registrationId']) as String?;
+    final result =
+        response['result'] is Map<String, dynamic>
+            ? response['result'] as Map<String, dynamic>
+            : response;
+    final regId =
+        (result['registrationId'] ?? response['registrationId']) as String?;
     if (regId == null) {
-      throw const ServerException('RegisterTeam: missing registrationId in response');
+      throw const ServerException(
+        'RegisterTeam: missing registrationId in response',
+      );
     }
-    final row = await _supabase
-        .from(_canonicalRegistrationsTable)
-        .select('''
+    final row =
+        await _supabase
+            .from(_canonicalRegistrationsTable)
+            .select('''
           *,
           teams (
             team_name,
@@ -447,8 +466,8 @@ class TournamentsRemoteDataSource {
             team_colors
           )
         ''')
-        .eq('registration_id', regId)
-        .single();
+            .eq('registration_id', regId)
+            .single();
     return TournamentRegistrationDto.fromJson(row);
   }
 
@@ -459,8 +478,7 @@ class TournamentsRemoteDataSource {
     );
   }
 
-  Future<void> rejectRegistration(
-      String registrationId, String reason) async {
+  Future<void> rejectRegistration(String registrationId, String reason) async {
     await _backend(
       '/api/v1/tournament-registrations/$registrationId/reject',
       body: {'commandId': _uuid.v4(), 'reason': reason},
@@ -468,14 +486,13 @@ class TournamentsRemoteDataSource {
   }
 
   /// Withdraws a pending registration application before it is accepted.
-  Future<void> withdrawPendingRegistration(String registrationId,
-      {String? reason}) async {
+  Future<void> withdrawPendingRegistration(
+    String registrationId, {
+    String? reason,
+  }) async {
     await _backend(
       '/api/v1/tournament-registrations/$registrationId/withdraw',
-      body: {
-        'commandId': _uuid.v4(),
-        if (reason != null) 'reason': reason,
-      },
+      body: {'commandId': _uuid.v4(), if (reason != null) 'reason': reason},
     );
   }
 
@@ -483,17 +500,15 @@ class TournamentsRemoteDataSource {
   Future<void> withdrawEntry(String entryId, {String? reason}) async {
     await _backend(
       '/api/v1/tournament-entries/$entryId/withdraw',
-      body: {
-        'commandId': _uuid.v4(),
-        if (reason != null) 'reason': reason,
-      },
+      body: {'commandId': _uuid.v4(), if (reason != null) 'reason': reason},
     );
   }
 
   // ─── Canonical Entry / Squad / Payment Queries ─────────────────────────────
 
   Future<List<TournamentEntryDto>> getTournamentEntries(
-      String tournamentId) async {
+    String tournamentId,
+  ) async {
     try {
       final rows = await _supabase
           .from(_canonicalEntriesTable)
@@ -514,7 +529,8 @@ class TournamentsRemoteDataSource {
   }
 
   Future<List<TournamentSquadMemberDto>> getEntrySquadMembers(
-      String entryId) async {
+    String entryId,
+  ) async {
     try {
       final rows = await _supabase
           .from(_canonicalSquadMembersTable)
@@ -551,12 +567,16 @@ class TournamentsRemoteDataSource {
         if (unclaimedId != null) 'unclaimedId': unclaimedId,
       },
     );
-    final result = response['result'] is Map<String, dynamic>
-        ? response['result'] as Map<String, dynamic>
-        : response;
-    final memberId = (result['squadMemberId'] ?? response['squadMemberId']) as String?;
+    final result =
+        response['result'] is Map<String, dynamic>
+            ? response['result'] as Map<String, dynamic>
+            : response;
+    final memberId =
+        (result['squadMemberId'] ?? response['squadMemberId']) as String?;
     if (memberId == null) {
-      throw const ServerException('AddSquadMember: missing squadMemberId in response');
+      throw const ServerException(
+        'AddSquadMember: missing squadMemberId in response',
+      );
     }
     return memberId;
   }
@@ -567,10 +587,7 @@ class TournamentsRemoteDataSource {
   }) async {
     await _backend(
       '/api/v1/tournament-squad-members/$squadMemberId/remove',
-      body: {
-        'commandId': _uuid.v4(),
-        if (reason != null) 'reason': reason,
-      },
+      body: {'commandId': _uuid.v4(), if (reason != null) 'reason': reason},
     );
   }
 
@@ -583,7 +600,8 @@ class TournamentsRemoteDataSource {
   }
 
   Future<List<TournamentEntryPaymentDto>> getEntryPayments(
-      String entryId) async {
+    String entryId,
+  ) async {
     try {
       final rows = await _supabase
           .from(_canonicalPaymentsTable)
@@ -596,9 +614,6 @@ class TournamentsRemoteDataSource {
       throw ServerException(e.message);
     }
   }
-
-
-
 
   // ─── Fixtures & Standings ──────────────────────────────────────────────────
 
@@ -653,8 +668,6 @@ class TournamentsRemoteDataSource {
         .map((rows) => rows.map(TournamentStandingDto.fromJson).toList());
   }
 
-
-
   Future<TournamentAwards> getSuggestedAwards(String tournamentId) async {
     try {
       final tournament = await getTournament(tournamentId);
@@ -668,14 +681,13 @@ class TournamentsRemoteDataSource {
   }
 
   Future<void> confirmAwards(
-      String tournamentId, TournamentAwards awards) async {
+    String tournamentId,
+    TournamentAwards awards,
+  ) async {
     try {
       await _supabase.rpc<void>(
         'confirm_tournament_awards',
-        params: {
-          'p_tournament_id': tournamentId,
-          'p_awards': awards.toJson(),
-        },
+        params: {'p_tournament_id': tournamentId, 'p_awards': awards.toJson()},
       );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -688,8 +700,10 @@ class TournamentsRemoteDataSource {
   /// This is what makes the hub's "Playing" bucket real: a tournament is one
   /// you play in when a team you manage has a registration in it. Deriving it
   /// from the team side keeps it to a single query and needs no new RPC.
-  Future<List<({TournamentDto tournament, TournamentRegistrationDto registration})>>
-      getMyRegistrations(List<String> teamIds) async {
+  Future<
+    List<({TournamentDto tournament, TournamentRegistrationDto registration})>
+  >
+  getMyRegistrations(List<String> teamIds) async {
     if (teamIds.isEmpty) return [];
     try {
       final rows = await _supabase
@@ -708,7 +722,9 @@ class TournamentsRemoteDataSource {
           .order('registered_at', ascending: false);
 
       final out =
-          <({TournamentDto tournament, TournamentRegistrationDto registration})>[];
+          <
+            ({TournamentDto tournament, TournamentRegistrationDto registration})
+          >[];
       for (final row in rows) {
         final embedded = row['tournaments'];
         if (embedded is! Map<String, dynamic>) continue;
@@ -759,10 +775,13 @@ class TournamentsRemoteDataSource {
       }
 
       if (bannerUrl != null || logoUrl != null) {
-        await _supabase.from(_tournamentsTable).update({
-          if (bannerUrl != null) 'banner_image_url': bannerUrl,
-          if (logoUrl != null) 'logo_url': logoUrl,
-        }).eq('tournament_id', tournamentId);
+        await _supabase
+            .from(_tournamentsTable)
+            .update({
+              if (bannerUrl != null) 'banner_image_url': bannerUrl,
+              if (logoUrl != null) 'logo_url': logoUrl,
+            })
+            .eq('tournament_id', tournamentId);
       }
 
       return (bannerUrl: bannerUrl, logoUrl: logoUrl);
@@ -780,7 +799,9 @@ class TournamentsRemoteDataSource {
     required String name,
   }) async {
     final path = '$tournamentId/$name';
-    await _supabase.storage.from(bucket).upload(
+    await _supabase.storage
+        .from(bucket)
+        .upload(
           path,
           file,
           fileOptions: const FileOptions(
@@ -835,22 +856,23 @@ class TournamentsRemoteDataSource {
   }) async {
     final uid = _requireUid();
     try {
-      final row = await _supabase
-          .from(_groundsTable)
-          .insert({
-            'name': name,
-            'created_by': uid,
-            'has_floodlights': hasFloodlights,
-            if (surface != null) 'surface': surface.wire,
-            if (notes != null && notes.isNotEmpty) 'notes': notes,
-            'location': {
-              if (city != null && city.isNotEmpty) 'city': city,
-              if (latitude != null) 'lat': latitude,
-              if (longitude != null) 'lng': longitude,
-            },
-          })
-          .select()
-          .single();
+      final row =
+          await _supabase
+              .from(_groundsTable)
+              .insert({
+                'name': name,
+                'created_by': uid,
+                'has_floodlights': hasFloodlights,
+                if (surface != null) 'surface': surface.wire,
+                if (notes != null && notes.isNotEmpty) 'notes': notes,
+                'location': {
+                  if (city != null && city.isNotEmpty) 'city': city,
+                  if (latitude != null) 'lat': latitude,
+                  if (longitude != null) 'lng': longitude,
+                },
+              })
+              .select()
+              .single();
       return GroundDto.fromJson(row).toEntity();
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -1066,7 +1088,8 @@ class TournamentsRemoteDataSource {
         'commandId': _uuid.v4(),
         'amount': amountPaid,
         'paymentChannel': channel?.wire ?? 'cash',
-        if (reference != null && reference.isNotEmpty) 'paymentReference': reference,
+        if (reference != null && reference.isNotEmpty)
+          'paymentReference': reference,
       },
     );
   }
@@ -1176,17 +1199,14 @@ class TournamentsRemoteDataSource {
     TargetMethod method = TargetMethod.runRate,
     String? reason,
   }) async {
-    await _matchAction(
-      'tournament_revise_match_conditions',
-      {
-        'p_match_id': matchId,
-        'p_revised_overs': revisedOvers,
-        'p_bowler_quota': bowlerQuota,
-        if (revisedTarget != null) 'p_revised_target': revisedTarget,
-        'p_method': method.wire,
-        if (reason != null) 'p_reason': reason,
-      },
-    );
+    await _matchAction('tournament_revise_match_conditions', {
+      'p_match_id': matchId,
+      'p_revised_overs': revisedOvers,
+      'p_bowler_quota': bowlerQuota,
+      if (revisedTarget != null) 'p_revised_target': revisedTarget,
+      'p_method': method.wire,
+      if (reason != null) 'p_reason': reason,
+    });
   }
 
   Future<void> triggerSuperOver({
@@ -1219,14 +1239,16 @@ class TournamentsRemoteDataSource {
         ),
       ]);
       return TournamentLeaderboards(
-        batting: results[0]
-            .cast<Map<String, dynamic>>()
-            .map((r) => TournamentLeaderDto(r, batting: true).toEntity())
-            .toList(),
-        bowling: results[1]
-            .cast<Map<String, dynamic>>()
-            .map((r) => TournamentLeaderDto(r, batting: false).toEntity())
-            .toList(),
+        batting:
+            results[0]
+                .cast<Map<String, dynamic>>()
+                .map((r) => TournamentLeaderDto(r, batting: true).toEntity())
+                .toList(),
+        bowling:
+            results[1]
+                .cast<Map<String, dynamic>>()
+                .map((r) => TournamentLeaderDto(r, batting: false).toEntity())
+                .toList(),
       );
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -1282,13 +1304,13 @@ class TournamentsRemoteDataSource {
       },
       body: body == null ? null : jsonEncode(body),
     );
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
+    final decoded =
+        response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = decoded is Map<String, dynamic>
-          ? decoded['message']?.toString() ?? 'Backend request failed'
-          : 'Backend request failed';
+      final message =
+          decoded is Map<String, dynamic>
+              ? decoded['message']?.toString() ?? 'Backend request failed'
+              : 'Backend request failed';
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message);
       }

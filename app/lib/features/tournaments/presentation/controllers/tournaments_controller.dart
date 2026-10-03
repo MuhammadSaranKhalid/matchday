@@ -13,6 +13,7 @@ import '../../domain/entities/tournament_live_match.dart';
 import '../../domain/entities/tournament_registration.dart';
 import '../../domain/repositories/tournaments_repository.dart';
 import '../providers/tournaments_providers.dart';
+import '../../domain/entities/tournament_squad_proposal_member.dart';
 
 part 'tournaments_controller.g.dart';
 
@@ -67,7 +68,9 @@ class TournamentsController extends _$TournamentsController {
   }
 
   Future<bool> updateTournament(
-      String tournamentId, Map<String, dynamic> updates) async {
+    String tournamentId,
+    Map<String, dynamic> updates,
+  ) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.updateTournament(tournamentId, updates);
@@ -178,15 +181,17 @@ class TournamentsController extends _$TournamentsController {
   Future<TournamentRegistration?> registerTeam({
     required String tournamentId,
     required String teamId,
-    required List<String> squadPlayerIds,
+    required List<TournamentSquadProposalMember> squadProposal,
     String? message,
   }) async {
     state = const AsyncLoading();
+
     final repo = ref.read(tournamentsRepositoryProvider);
+
     final result = await repo.registerTeam(
       tournamentId: tournamentId,
       teamId: teamId,
-      squadPlayerIds: squadPlayerIds,
+      squadProposal: squadProposal,
       message: message,
     );
     return result.fold(
@@ -206,7 +211,9 @@ class TournamentsController extends _$TournamentsController {
   }
 
   Future<bool> approveRegistration(
-      String tournamentId, String registrationId) async {
+    String tournamentId,
+    String registrationId,
+  ) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.approveRegistration(registrationId);
@@ -227,7 +234,10 @@ class TournamentsController extends _$TournamentsController {
   }
 
   Future<bool> rejectRegistration(
-      String tournamentId, String registrationId, String reason) async {
+    String tournamentId,
+    String registrationId,
+    String reason,
+  ) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.rejectRegistration(registrationId, reason);
@@ -248,7 +258,9 @@ class TournamentsController extends _$TournamentsController {
   }
 
   Future<bool> withdrawPendingRegistration(
-      String tournamentId, String registrationId) async {
+    String tournamentId,
+    String registrationId,
+  ) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.withdrawPendingRegistration(registrationId);
@@ -268,7 +280,10 @@ class TournamentsController extends _$TournamentsController {
   }
 
   Future<bool> withdrawEntry(
-      String tournamentId, String entryId, {String? reason}) async {
+    String tournamentId,
+    String entryId, {
+    String? reason,
+  }) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
     final result = await repo.withdrawEntry(entryId, reason: reason);
@@ -286,10 +301,6 @@ class TournamentsController extends _$TournamentsController {
       },
     );
   }
-
-
-
-
 
   Future<bool> confirmAwards(
     String tournamentId,
@@ -435,26 +446,24 @@ class TournamentsController extends _$TournamentsController {
     required String tournamentId,
     required String matchId,
     required String userId,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.assignScorer(matchId: matchId, userId: userId),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.assignScorer(matchId: matchId, userId: userId),
+  );
 
   Future<bool> rescheduleMatch({
     required String tournamentId,
     required String matchId,
     required DateTime startTime,
     String? venue,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.rescheduleMatch(
-          matchId: matchId,
-          startTime: startTime,
-          venue: venue,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.rescheduleMatch(
+      matchId: matchId,
+      startTime: startTime,
+      venue: venue,
+    ),
+  );
 
   Future<bool> abandonMatch({
     required String tournamentId,
@@ -462,60 +471,56 @@ class TournamentsController extends _$TournamentsController {
     required AbandonMode mode,
     DateTime? rescheduleTo,
     String? reason,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.abandonMatch(
-          matchId: matchId,
-          mode: mode,
-          rescheduleTo: rescheduleTo,
-          reason: reason,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.abandonMatch(
+      matchId: matchId,
+      mode: mode,
+      rescheduleTo: rescheduleTo,
+      reason: reason,
+    ),
+  );
 
   Future<bool> declareWalkover({
     required String tournamentId,
     required String matchId,
     required String winnerTeamId,
     String? reason,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.declareWalkover(
-          matchId: matchId,
-          winnerTeamId: winnerTeamId,
-          reason: reason,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.declareWalkover(
+      matchId: matchId,
+      winnerTeamId: winnerTeamId,
+      reason: reason,
+    ),
+  );
 
   Future<bool> overrideResult({
     required String tournamentId,
     required String matchId,
     required String winnerTeamId,
     required String reason,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.overrideResult(
-          matchId: matchId,
-          winnerTeamId: winnerTeamId,
-          reason: reason,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.overrideResult(
+      matchId: matchId,
+      winnerTeamId: winnerTeamId,
+      reason: reason,
+    ),
+  );
 
   Future<bool> setCoOrganizer({
     required String tournamentId,
     required String userId,
     required bool add,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.setCoOrganizer(
-          tournamentId: tournamentId,
-          userId: userId,
-          add: add,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.setCoOrganizer(
+      tournamentId: tournamentId,
+      userId: userId,
+      add: add,
+    ),
+  );
 
   /// Returns the number of people reached, or null if the send failed.
   Future<int?> sendAnnouncement({
@@ -585,10 +590,7 @@ class TournamentsController extends _$TournamentsController {
   }) async {
     final ok = await _run(
       tournamentId,
-      (repo) => repo.voidPayment(
-        paymentId: paymentId,
-        voidReason: voidReason,
-      ),
+      (repo) => repo.voidPayment(paymentId: paymentId, voidReason: voidReason),
     );
     if (ok && ref.mounted) {
       ref.invalidate(tournamentFeeLedgerProvider(tournamentId));
@@ -657,29 +659,27 @@ class TournamentsController extends _$TournamentsController {
     int? revisedTarget,
     TargetMethod method = TargetMethod.runRate,
     String? reason,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.reviseMatchConditions(
-          matchId: matchId,
-          revisedOvers: revisedOvers,
-          bowlerQuota: bowlerQuota,
-          revisedTarget: revisedTarget,
-          method: method,
-          reason: reason,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.reviseMatchConditions(
+      matchId: matchId,
+      revisedOvers: revisedOvers,
+      bowlerQuota: bowlerQuota,
+      revisedTarget: revisedTarget,
+      method: method,
+      reason: reason,
+    ),
+  );
 
   Future<bool> triggerSuperOver({
     required String tournamentId,
     required String matchId,
     required String batsFirstTeamId,
-  }) =>
-      _run(
-        tournamentId,
-        (repo) => repo.triggerSuperOver(
-          matchId: matchId,
-          batsFirstTeamId: batsFirstTeamId,
-        ),
-      );
+  }) => _run(
+    tournamentId,
+    (repo) => repo.triggerSuperOver(
+      matchId: matchId,
+      batsFirstTeamId: batsFirstTeamId,
+    ),
+  );
 }

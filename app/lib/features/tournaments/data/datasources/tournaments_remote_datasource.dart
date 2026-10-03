@@ -516,8 +516,7 @@ class TournamentsRemoteDataSource {
             ? response['result'] as Map<String, dynamic>
             : response;
 
-    final entryRevision =
-        (result['entryRevision'] as num?)?.toInt();
+    final entryRevision = (result['entryRevision'] as num?)?.toInt();
 
     if (entryRevision == null) {
       throw const ServerException(
@@ -599,11 +598,9 @@ class TournamentsRemoteDataSource {
             ? response['result'] as Map<String, dynamic>
             : response;
 
-    final squadMemberId =
-        result['squadMemberId'] as String?;
+    final squadMemberId = result['squadMemberId'] as String?;
 
-    final squadRevision =
-        (result['squadRevision'] as num?)?.toInt();
+    final squadRevision = (result['squadRevision'] as num?)?.toInt();
 
     if (squadMemberId == null) {
       throw const ServerException(
@@ -617,10 +614,7 @@ class TournamentsRemoteDataSource {
       );
     }
 
-    return (
-      squadMemberId: squadMemberId,
-      squadRevision: squadRevision,
-    );
+    return (squadMemberId: squadMemberId, squadRevision: squadRevision);
   }
 
   Future<int> removeSquadMember({
@@ -642,8 +636,7 @@ class TournamentsRemoteDataSource {
             ? response['result'] as Map<String, dynamic>
             : response;
 
-    final squadRevision =
-        (result['squadRevision'] as num?)?.toInt();
+    final squadRevision = (result['squadRevision'] as num?)?.toInt();
 
     if (squadRevision == null) {
       throw const ServerException(
@@ -661,10 +654,7 @@ class TournamentsRemoteDataSource {
   }) async {
     final response = await _backend(
       '/api/v1/tournament-entries/$entryId/squad/freeze',
-      body: {
-        'commandId': _uuid.v4(),
-        'expectedRevision': expectedRevision,
-      },
+      body: {'commandId': _uuid.v4(), 'expectedRevision': expectedRevision},
     );
 
     final result =
@@ -672,8 +662,7 @@ class TournamentsRemoteDataSource {
             ? response['result'] as Map<String, dynamic>
             : response;
 
-    final squadRevision =
-        (result['squadRevision'] as num?)?.toInt();
+    final squadRevision = (result['squadRevision'] as num?)?.toInt();
 
     if (squadRevision == null) {
       throw const ServerException(
@@ -1163,7 +1152,7 @@ class TournamentsRemoteDataSource {
 
   Future<void> recordPayment({
     required String entryId,
-    required double amountPaid,
+    required double amountReceived,
     PaymentChannel? channel,
     String? reference,
   }) async {
@@ -1171,7 +1160,7 @@ class TournamentsRemoteDataSource {
       '/api/v1/tournament-entries/$entryId/payments',
       body: {
         'commandId': _uuid.v4(),
-        'amount': amountPaid,
+        'amount': amountReceived,
         'paymentChannel': channel?.wire ?? 'cash',
         if (reference != null && reference.isNotEmpty)
           'paymentReference': reference,
@@ -1182,14 +1171,11 @@ class TournamentsRemoteDataSource {
   /// Voids an existing entry payment.
   Future<void> voidPayment({
     required String paymentId,
-    String? voidReason,
+    required String voidReason,
   }) async {
     await _backend(
       '/api/v1/tournament-entry-payments/$paymentId/void',
-      body: {
-        'commandId': _uuid.v4(),
-        if (voidReason != null) 'voidReason': voidReason,
-      },
+      body: {'commandId': _uuid.v4(), 'voidReason': voidReason},
     );
   }
 

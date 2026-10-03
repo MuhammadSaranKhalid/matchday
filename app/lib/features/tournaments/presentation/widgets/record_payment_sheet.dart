@@ -8,13 +8,16 @@ import '../../domain/entities/tournament_fee_entry.dart';
 /// What the organiser decided in the sheet.
 class RecordPaymentOutcome {
   const RecordPaymentOutcome({
-    required this.amountPaid,
+    required this.amountReceived,
     this.channel,
     this.reference,
   });
 
-  /// The new cumulative figure for this registration, not a delta.
-  final double amountPaid;
+  /// Money received in this specific payment event.
+  ///
+  /// This is NOT the cumulative amount already paid by the team.
+  final double amountReceived;
+
   final PaymentChannel? channel;
   final String? reference;
 }
@@ -60,9 +63,11 @@ class _RecordPaymentSheetState extends State<_RecordPaymentSheet> {
   @override
   void initState() {
     super.initState();
-    // Pre-filled with the full outstanding amount: the common case is that the
-    // manager has just settled up.
-    final suggested = widget.entry.entryFee;
+    // Default to the outstanding balance.
+    //
+    // recordPayment is append-only: the entered value represents money received
+    // in this payment event, not the team's cumulative paid amount.
+    final suggested = widget.entry.outstanding;
     _amount = TextEditingController(text: suggested.round().toString());
     _reference = TextEditingController(text: widget.entry.reference ?? '');
     _channel = widget.entry.channel ?? PaymentChannel.cash;
@@ -77,20 +82,36 @@ class _RecordPaymentSheetState extends State<_RecordPaymentSheet> {
 
   double get _entered => double.tryParse(_amount.text.trim()) ?? 0;
 
-  bool get _valid =>
-      _entered >= 0 &&
-      (widget.entry.entryFee <= 0 || _entered <= widget.entry.entryFee);
+  bool get _valid {
+    final outstanding = widget.entry.outstanding;
+
+    return outstanding > 0 && _entered > 0 && _entered <= outstanding;
+  }
 
   String? get _error {
-    if (_amount.text.trim().isEmpty) return null;
-    if (double.tryParse(_amount.text.trim()) == null) {
+    final raw = _amount.text.trim();
+
+    if (raw.isEmpty) return null;
+
+    final parsed = double.tryParse(raw);
+
+    if (parsed == null) {
       return 'Enter the amount in figures.';
     }
-    if (_entered < 0) return 'An amount cannot be negative.';
-    if (widget.entry.entryFee > 0 && _entered > widget.entry.entryFee) {
-      return 'That is more than the '
-          'PKR ${_money.format(widget.entry.entryFee)} entry fee.';
+
+    if (widget.entry.outstanding <= 0) {
+      return 'This team has no outstanding entry fee.';
     }
+
+    if (parsed <= 0) {
+      return 'Payment amount must be greater than zero.';
+    }
+
+    if (parsed > widget.entry.outstanding) {
+      return 'That is more than the outstanding balance of '
+          'PKR ${_money.format(widget.entry.outstanding)}.';
+    }
+
     return null;
   }
 
@@ -98,11 +119,10 @@ class _RecordPaymentSheetState extends State<_RecordPaymentSheet> {
     if (!_valid) return;
     Navigator.of(context).pop(
       RecordPaymentOutcome(
-        amountPaid: _entered,
+        amountReceived: _entered,
         channel: _channel,
-        reference: _reference.text.trim().isEmpty
-            ? null
-            : _reference.text.trim(),
+        reference:
+            _reference.text.trim().isEmpty ? null : _reference.text.trim(),
       ),
     );
   }
@@ -171,19 +191,17 @@ class _RecordPaymentSheetState extends State<_RecordPaymentSheet> {
                   const SizedBox(height: 6),
                   Text(
                     message,
-                    style: CkType.body(
-                      fontSize: 11.5,
-                      color: CkColors.redInk,
-                    ),
+                    style: CkType.body(fontSize: 11.5, color: CkColors.redInk),
                   ),
                 ],
                 const SizedBox(height: 8),
                 _AmountPresets(
                   entry: entry,
                   entered: _entered,
-                  onPick: (value) => setState(() {
-                    _amount.text = value.round().toString();
-                  }),
+                  onPick:
+                      (value) => setState(() {
+                        _amount.text = value.round().toString();
+                      }),
                 ),
 
                 const SizedBox(height: 16),
@@ -277,14 +295,14 @@ class _Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: CkType.mono(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.12,
-          color: CkColors.muted,
-        ),
-      );
+    text.toUpperCase(),
+    style: CkType.mono(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.12,
+      color: CkColors.muted,
+    ),
+  );
 }
 
 class _AmountField extends StatelessWidget {
@@ -378,12 +396,10 @@ class _AmountPresets extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final outstanding = entry.outstanding;
-    final full = entry.entryFee;
 
     final options = <(String, double)>[
-      if (outstanding > 0 && outstanding != full)
-        (_money.format(outstanding), outstanding),
-      if (full > 0) ('${_money.format(full)} · full', full),
+      if (outstanding > 0)
+        ('${_money.format(outstanding)} · remaining', outstanding),
     ];
 
     if (options.isEmpty) return const SizedBox.shrink();
@@ -426,7 +442,7 @@ class _ReferenceField extends StatelessWidget {
       child: TextField(
         controller: controller,
         maxLines: 2,
-        maxLength: 200,
+        maxLength: 100,
         style: CkType.body(fontSize: 12.5, height: 1.5, color: CkColors.ink),
         decoration: InputDecoration(
           border: InputBorder.none,
@@ -451,11 +467,7 @@ class _ReferenceField extends StatelessWidget {
 /// The cream consequence block. States what the ledger will read after saving,
 /// so the organiser is not left computing it.
 class _AfterSaving extends StatelessWidget {
-  const _AfterSaving({
-    required this.entry,
-    required this.entered,
-    this.totals,
-  });
+  const _AfterSaving({required this.entry, required this.entered, this.totals});
 
   final TournamentFeeEntry entry;
   final double entered;
@@ -465,20 +477,25 @@ class _AfterSaving extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settled = entry.entryFee > 0 && entered >= entry.entryFee;
-    final label = settled
-        ? 'PAID · ${_money.format(entered)} / '
-            '${_money.format(entry.entryFee)}'
-        : 'PARTIAL · ${_money.format(entered)} / '
-            '${_money.format(entry.entryFee)}';
+    final newTotal = entry.amountPaid + entered;
+
+    final settled = entry.entryFee > 0 && newTotal >= entry.entryFee;
+
+    final label =
+        settled
+            ? 'PAID · ${_money.format(newTotal)} / '
+                '${_money.format(entry.entryFee)}'
+            : 'PARTIAL · ${_money.format(newTotal)} / '
+                '${_money.format(entry.entryFee)}';
 
     // The tournament-wide effect, when the caller passed the totals in.
     String? cupLine;
     final t = totals;
     if (t != null && t.expected > 0) {
-      final after = t.collected - entry.amountPaid + entered;
+      final after = t.collected + entered;
       final percent = ((after / t.expected) * 100).round();
-      cupLine = 'Tournament collected rises to PKR '
+      cupLine =
+          'Tournament collected rises to PKR '
           '${_money.format(after)} ($percent%). ';
     }
 
@@ -522,11 +539,7 @@ class _AfterSaving extends StatelessWidget {
           Text(
             '${cupLine ?? ''}The manager gets a receipt with your name and '
             'today’s date; entries stay editable afterwards.',
-            style: CkType.body(
-              fontSize: 12,
-              height: 1.5,
-              color: CkColors.ink2,
-            ),
+            style: CkType.body(fontSize: 12, height: 1.5, color: CkColors.ink2),
           ),
         ],
       ),

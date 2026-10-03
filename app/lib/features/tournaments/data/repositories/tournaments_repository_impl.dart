@@ -301,12 +301,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<
-      Either<
-        Failure,
-        ({String squadMemberId, int squadRevision})
-      >
-    >
+  Future<Either<Failure, ({String squadMemberId, int squadRevision})>>
   addSquadMember({
     required String entryId,
     required int expectedRevision,
@@ -805,30 +800,34 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, Unit>> recordPayment({
     required String entryId,
-    required double amountPaid,
+    required double amountReceived,
     PaymentChannel? channel,
     String? reference,
   }) async {
-    // Business rules live here, not in the sheet: a negative receipt is a
-    // typo, and a reference longer than the column would be truncated
-    // silently by Postgres.
-    if (amountPaid < 0) {
-      return const Left(ValidationFailure('An amount cannot be negative'));
-    }
-    final note = reference?.trim();
-    if (note != null && note.length > 200) {
+    // One row represents one payment event, therefore zero and negative
+    // amounts are never valid receipts.
+    if (amountReceived <= 0) {
       return const Left(
-        ValidationFailure('Keep the reference under 200 characters'),
+        ValidationFailure('Payment amount must be greater than zero'),
+      );
+    }
+
+    final note = reference?.trim();
+
+    if (note != null && note.length > 100) {
+      return const Left(
+        ValidationFailure('Keep the reference under 100 characters'),
       );
     }
 
     try {
       await _remote.recordPayment(
         entryId: entryId,
-        amountPaid: amountPaid,
+        amountReceived: amountReceived,
         channel: channel,
         reference: note == null || note.isEmpty ? null : note,
       );
+
       return const Right(unit);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
@@ -842,10 +841,23 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, void>> voidPayment({
     required String paymentId,
-    String? voidReason,
+    required String voidReason,
   }) async {
+    final reason = voidReason.trim();
+
+    if (reason.isEmpty) {
+      return const Left(ValidationFailure('Void reason is required'));
+    }
+
+    if (reason.length > 500) {
+      return const Left(
+        ValidationFailure('Keep the void reason under 500 characters'),
+      );
+    }
+
     try {
-      await _remote.voidPayment(paymentId: paymentId, voidReason: voidReason);
+      await _remote.voidPayment(paymentId: paymentId, voidReason: reason);
+
       return const Right(null);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));

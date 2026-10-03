@@ -32,44 +32,60 @@ void main() {
       when(
         () => remote.recordPayment(
           entryId: any(named: 'entryId'),
-          amountPaid: any(named: 'amountPaid'),
+          amountReceived: any(named: 'amountReceived'),
           channel: any(named: 'channel'),
           reference: any(named: 'reference'),
         ),
       ).thenAnswer((_) async {});
     }
 
-    test('rejects a negative amount without calling the remote', () async {
-      final result = await repo.recordPayment(
-        entryId: 'r1',
-        amountPaid: -1,
-      );
+    test('rejects zero without calling the remote', () async {
+      final result = await repo.recordPayment(entryId: 'r1', amountReceived: 0);
 
       expect(result.isLeft(), isTrue);
       expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+
       verifyNever(
         () => remote.recordPayment(
           entryId: any(named: 'entryId'),
-          amountPaid: any(named: 'amountPaid'),
+          amountReceived: any(named: 'amountReceived'),
         ),
       );
     });
 
-    test('rejects a reference longer than the column', () async {
+    test('rejects a negative payment event', () async {
       final result = await repo.recordPayment(
         entryId: 'r1',
-        amountPaid: 100,
-        reference: 'x' * 201,
+        amountReceived: -1,
+      );
+
+      expect(result.isLeft(), isTrue);
+      expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+
+      verifyNever(
+        () => remote.recordPayment(
+          entryId: any(named: 'entryId'),
+          amountReceived: any(named: 'amountReceived'),
+        ),
+      );
+    });
+
+    test('rejects a reference longer than the backend limit', () async {
+      final result = await repo.recordPayment(
+        entryId: 'r1',
+        amountReceived: 100,
+        reference: 'x' * 101,
       );
 
       expect(result.getLeft().toNullable(), isA<ValidationFailure>());
     });
 
-    test('trims the reference and drops an empty one', () async {
+    test('forwards one payment event and trims an empty reference', () async {
       stub();
+
       await repo.recordPayment(
         entryId: 'r1',
-        amountPaid: 5000,
+        amountReceived: 2000,
         channel: PaymentChannel.cash,
         reference: '   ',
       );
@@ -77,9 +93,29 @@ void main() {
       verify(
         () => remote.recordPayment(
           entryId: 'r1',
-          amountPaid: 5000,
+          amountReceived: 2000,
           channel: PaymentChannel.cash,
           reference: null,
+        ),
+      ).called(1);
+    });
+
+    test('does not convert event amount into a cumulative total', () async {
+      stub();
+
+      await repo.recordPayment(
+        entryId: 'r1',
+        amountReceived: 2000,
+        channel: PaymentChannel.bankTransfer,
+        reference: 'TX-123',
+      );
+
+      verify(
+        () => remote.recordPayment(
+          entryId: 'r1',
+          amountReceived: 2000,
+          channel: PaymentChannel.bankTransfer,
+          reference: 'TX-123',
         ),
       ).called(1);
     });
@@ -88,18 +124,53 @@ void main() {
       when(
         () => remote.recordPayment(
           entryId: any(named: 'entryId'),
-          amountPaid: any(named: 'amountPaid'),
+          amountReceived: any(named: 'amountReceived'),
           channel: any(named: 'channel'),
           reference: any(named: 'reference'),
         ),
       ).thenThrow(const ServerException('nope'));
 
-      final result = await repo.recordPayment(
-        entryId: 'r1',
-        amountPaid: 1,
-      );
+      final result = await repo.recordPayment(entryId: 'r1', amountReceived: 1);
 
       expect(result.getLeft().toNullable(), isA<ServerFailure>());
+    });
+  });
+
+  group('voidPayment', () {
+    test('requires a non-empty reason', () async {
+      final result = await repo.voidPayment(paymentId: 'p1', voidReason: '   ');
+
+      expect(result.getLeft().toNullable(), isA<ValidationFailure>());
+
+      verifyNever(
+        () => remote.voidPayment(
+          paymentId: any(named: 'paymentId'),
+          voidReason: any(named: 'voidReason'),
+        ),
+      );
+    });
+
+    test('trims and forwards the void reason', () async {
+      when(
+        () => remote.voidPayment(
+          paymentId: any(named: 'paymentId'),
+          voidReason: any(named: 'voidReason'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final result = await repo.voidPayment(
+        paymentId: 'p1',
+        voidReason: '  Duplicate receipt  ',
+      );
+
+      expect(result.isRight(), isTrue);
+
+      verify(
+        () => remote.voidPayment(
+          paymentId: 'p1',
+          voidReason: 'Duplicate receipt',
+        ),
+      ).called(1);
     });
   });
 
@@ -259,12 +330,16 @@ void main() {
     expect(result.getRight().toNullable(), 3);
   });
 
-  test('autoAssignScorers surfaces a permission error as AuthFailure', () async {
-    when(() => remote.autoAssignScorers(any()))
-        .thenThrow(const UnauthorizedException('not an organiser'));
+  test(
+    'autoAssignScorers surfaces a permission error as AuthFailure',
+    () async {
+      when(
+        () => remote.autoAssignScorers(any()),
+      ).thenThrow(const UnauthorizedException('not an organiser'));
 
-    final result = await repo.autoAssignScorers('t1');
+      final result = await repo.autoAssignScorers('t1');
 
-    expect(result.getLeft().toNullable(), isA<AuthFailure>());
-  });
+      expect(result.getLeft().toNullable(), isA<AuthFailure>());
+    },
+  );
 }

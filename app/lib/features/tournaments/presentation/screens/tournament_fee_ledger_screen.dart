@@ -42,7 +42,8 @@ class _TournamentFeeLedgerScreenState
   Future<void> _record(TournamentFeeEntry entry) async {
     // Hand the sheet the cup-wide totals so its "After saving" block can state
     // what the tournament collects afterwards, rather than only this team.
-    final rows = ref.read(tournamentFeeLedgerProvider(widget.tournamentId)).value;
+    final rows =
+        ref.read(tournamentFeeLedgerProvider(widget.tournamentId)).value;
     final outcome = await showRecordPaymentSheet(
       context,
       entry: entry,
@@ -50,10 +51,12 @@ class _TournamentFeeLedgerScreenState
     );
     if (outcome == null || !mounted) return;
 
-    final ok = await ref.read(tournamentsControllerProvider.notifier).recordPayment(
+    final ok = await ref
+        .read(tournamentsControllerProvider.notifier)
+        .recordPayment(
           tournamentId: widget.tournamentId,
           entryId: entry.entryId,
-          amountPaid: outcome.amountPaid,
+          amountReceived: outcome.amountReceived,
           channel: outcome.channel,
           reference: outcome.reference,
         );
@@ -64,7 +67,7 @@ class _TournamentFeeLedgerScreenState
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Recorded PKR ${_money.format(outcome.amountPaid)} '
+            'Recorded PKR ${_money.format(outcome.amountReceived)} '
             'for ${entry.teamName}.',
           ),
         ),
@@ -88,38 +91,42 @@ class _TournamentFeeLedgerScreenState
   void _sendReminder(TournamentFeeEntry entry) {
     context.push(
       '/tournaments/${widget.tournamentId}/announce',
-      extra: 'Reminder for ${entry.teamName}: PKR '
+      extra:
+          'Reminder for ${entry.teamName}: PKR '
           '${_money.format(entry.outstanding)} of the entry fee is still '
           'outstanding. Please settle it before your next fixture.',
     );
   }
 
   void _exportCsv(List<TournamentFeeEntry> entries, Tournament? tournament) {
-    final buffer = StringBuffer()
-      ..writeln('Team,Status,Amount paid,Entry fee,Outstanding,'
-          'Channel,Reference,Recorded on,Recorded by');
+    final buffer =
+        StringBuffer()..writeln(
+          'Team,Status,Amount paid,Entry fee,Outstanding,'
+          'Channel,Reference,Recorded on,Recorded by',
+        );
     for (final e in entries) {
-      buffer.writeln([
-        _csv(e.teamName),
-        _csv(e.state.label),
-        e.amountPaid.toStringAsFixed(0),
-        e.entryFee.toStringAsFixed(0),
-        e.outstanding.toStringAsFixed(0),
-        _csv(e.channel?.label ?? ''),
-        _csv(e.reference ?? ''),
-        _csv(e.recordedAt == null
-            ? ''
-            : DateFormat('yyyy-MM-dd').format(e.recordedAt!)),
-        _csv(e.recordedByName ?? ''),
-      ].join(','));
+      buffer.writeln(
+        [
+          _csv(e.teamName),
+          _csv(e.state.label),
+          e.amountPaid.toStringAsFixed(0),
+          e.entryFee.toStringAsFixed(0),
+          e.outstanding.toStringAsFixed(0),
+          _csv(e.channel?.label ?? ''),
+          _csv(e.reference ?? ''),
+          _csv(
+            e.recordedAt == null
+                ? ''
+                : DateFormat('yyyy-MM-dd').format(e.recordedAt!),
+          ),
+          _csv(e.recordedByName ?? ''),
+        ].join(','),
+      );
     }
 
     final name = tournament?.name ?? 'Tournament';
     SharePlus.instance.share(
-      ShareParams(
-        text: buffer.toString(),
-        subject: '$name — fee ledger',
-      ),
+      ShareParams(text: buffer.toString(), subject: '$name — fee ledger'),
     );
   }
 
@@ -152,30 +159,33 @@ class _TournamentFeeLedgerScreenState
             Expanded(
               child: switch (ledger) {
                 AsyncLoading() => const Center(
-                    child: CircularProgressIndicator(color: CkColors.ink),
-                  ),
+                  child: CircularProgressIndicator(color: CkColors.ink),
+                ),
                 AsyncError(:final error) => _LedgerError(
-                    message: '$error',
-                    onRetry: () => ref.invalidate(
-                      tournamentFeeLedgerProvider(widget.tournamentId),
-                    ),
-                  ),
+                  message: '$error',
+                  onRetry:
+                      () => ref.invalidate(
+                        tournamentFeeLedgerProvider(widget.tournamentId),
+                      ),
+                ),
                 AsyncData(value: final rows) => _LedgerBody(
-                    entries: rows,
-                    filter: _filter,
-                    showAllPaid: _showAllPaid,
-                    onFilter: (f) => setState(() {
-                      _filter = f;
-                      _showAllPaid = false;
-                    }),
-                    onShowAllPaid: () => setState(() => _showAllPaid = true),
-                    onRecord: _record,
-                    onRemind: _sendReminder,
-                    onExport: () => _exportCsv(rows, tournament),
-                    onRefresh: () async => ref.invalidate(
-                      tournamentFeeLedgerProvider(widget.tournamentId),
-                    ),
-                  ),
+                  entries: rows,
+                  filter: _filter,
+                  showAllPaid: _showAllPaid,
+                  onFilter:
+                      (f) => setState(() {
+                        _filter = f;
+                        _showAllPaid = false;
+                      }),
+                  onShowAllPaid: () => setState(() => _showAllPaid = true),
+                  onRecord: _record,
+                  onRemind: _sendReminder,
+                  onExport: () => _exportCsv(rows, tournament),
+                  onRefresh:
+                      () async => ref.invalidate(
+                        tournamentFeeLedgerProvider(widget.tournamentId),
+                      ),
+                ),
               },
             ),
           ],
@@ -326,9 +336,10 @@ class _LedgerBody extends StatelessWidget {
     // On "All", settled teams collapse to a single line so the money still
     // moving stays at the top of the screen.
     final collapsePaid = filter == _LedgerFilter.all && !showAllPaid;
-    final rows = collapsePaid
-        ? visible.where((e) => e.state != FeeState.paid).toList()
-        : visible;
+    final rows =
+        collapsePaid
+            ? visible.where((e) => e.state != FeeState.paid).toList()
+            : visible;
     final hiddenPaid = collapsePaid ? paid.length : 0;
 
     return RefreshIndicator(
@@ -404,9 +415,10 @@ class _TotalsCard extends StatelessWidget {
   static String _compact(double v) {
     if (v >= 1000) {
       final k = v / 1000;
-      final text = k >= 100 || k == k.roundToDouble()
-          ? k.round().toString()
-          : k.toStringAsFixed(1);
+      final text =
+          k >= 100 || k == k.roundToDouble()
+              ? k.round().toString()
+              : k.toStringAsFixed(1);
       return '${text}k';
     }
     return v.round().toString();
@@ -455,9 +467,10 @@ class _TotalsCard extends StatelessWidget {
                       value: _money.format(totals.outstanding),
                       // Amber, never red: the obligation is real but it is not
                       // an emergency, and money does not turn red here.
-                      note: totals.unsettledTeams == 1
-                          ? '1 team'
-                          : '${totals.unsettledTeams} teams',
+                      note:
+                          totals.unsettledTeams == 1
+                              ? '1 team'
+                              : '${totals.unsettledTeams} teams',
                       valueColor: CkColors.amberInk,
                       noteColor: CkColors.amberInk,
                     ),
@@ -521,10 +534,10 @@ class _TotalDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        color: CkColors.creamBorder,
-      );
+    width: 1,
+    margin: const EdgeInsets.symmetric(horizontal: 12),
+    color: CkColors.creamBorder,
+  );
 }
 
 class _Total extends StatelessWidget {
@@ -650,7 +663,10 @@ class _FilterChip extends StatelessWidget {
         onTap: onTap,
         child: Container(
           alignment: Alignment.center,
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: selected ? 7 : 7.5),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: selected ? 7 : 7.5,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
@@ -725,22 +741,29 @@ class _Crest extends StatelessWidget {
         border: Border.all(color: CkColors.line),
       ),
       alignment: Alignment.center,
-      child: url == null || url.isEmpty
-          ? Text(
-              entry.monogram,
-              style: CkType.display(fontSize: 11, fontWeight: FontWeight.w700),
-            )
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              width: 34,
-              height: 34,
-              errorBuilder: (_, __, ___) => Text(
+      child:
+          url == null || url.isEmpty
+              ? Text(
                 entry.monogram,
-                style:
-                    CkType.display(fontSize: 11, fontWeight: FontWeight.w700),
+                style: CkType.display(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+              : Image.network(
+                url,
+                fit: BoxFit.cover,
+                width: 34,
+                height: 34,
+                errorBuilder:
+                    (_, __, ___) => Text(
+                      entry.monogram,
+                      style: CkType.display(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
               ),
-            ),
     );
   }
 }
@@ -788,28 +811,29 @@ class _Details extends StatelessWidget {
           // Paid is a plain green-ink mono line — no chip. It is settled, so it
           // gets the least furniture on the row.
           FeeState.paid => Text(
-              'PAID · ${_money.format(entry.amountPaid)}',
-              style: CkType.mono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.06,
-                color: CkColors.greenInk,
-              ),
+            'PAID · ${_money.format(entry.amountPaid)}',
+            style: CkType.mono(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.06,
+              color: CkColors.greenInk,
             ),
+          ),
           FeeState.partial => _StatusChip(
-              label: 'Partial · ${_money.format(entry.amountPaid)} / '
-                  '${_money.format(entry.entryFee)}',
-              background: CkColors.cream,
-              border: CkColors.creamBorder,
-              foreground: CkColors.amberInk,
-            ),
+            label:
+                'Partial · ${_money.format(entry.amountPaid)} / '
+                '${_money.format(entry.entryFee)}',
+            background: CkColors.cream,
+            border: CkColors.creamBorder,
+            foreground: CkColors.amberInk,
+          ),
           // Unpaid is neutral paper, not red. Nothing has gone wrong yet.
           FeeState.unpaid => _StatusChip(
-              label: 'Unpaid · ${_money.format(entry.entryFee)}',
-              background: CkColors.paper2,
-              border: CkColors.line,
-              foreground: CkColors.ink2,
-            ),
+            label: 'Unpaid · ${_money.format(entry.entryFee)}',
+            background: CkColors.paper2,
+            border: CkColors.line,
+            foreground: CkColors.ink2,
+          ),
         },
         if (entry.state == FeeState.partial) ...[
           const SizedBox(height: 4),
@@ -1018,11 +1042,12 @@ class _LedgerEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _Notice(
-        icon: Icons.receipt_long_outlined,
-        title: 'No approved teams yet',
-        body: 'The ledger fills up as you approve teams. Fees are yours to '
-            'collect at the ground — matchday never holds the money.',
-      );
+    icon: Icons.receipt_long_outlined,
+    title: 'No approved teams yet',
+    body:
+        'The ledger fills up as you approve teams. Fees are yours to '
+        'collect at the ground — matchday never holds the money.',
+  );
 }
 
 class _FreeCup extends StatelessWidget {
@@ -1030,11 +1055,12 @@ class _FreeCup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _Notice(
-        icon: Icons.volunteer_activism_outlined,
-        title: 'This cup is free to enter',
-        body: 'There is no entry fee set, so there is nothing to reconcile. '
-            'Add a fee in tournament settings if that changes.',
-      );
+    icon: Icons.volunteer_activism_outlined,
+    title: 'This cup is free to enter',
+    body:
+        'There is no entry fee set, so there is nothing to reconcile. '
+        'Add a fee in tournament settings if that changes.',
+  );
 }
 
 class _LedgerError extends StatelessWidget {
@@ -1045,18 +1071,18 @@ class _LedgerError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Notice(
-        icon: Icons.cloud_off_outlined,
-        title: 'The ledger did not load',
-        body: message,
-        action: OutlinedButton(
-          onPressed: onRetry,
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: CkColors.line),
-            foregroundColor: CkColors.ink,
-          ),
-          child: const Text('Try again'),
-        ),
-      );
+    icon: Icons.cloud_off_outlined,
+    title: 'The ledger did not load',
+    body: message,
+    action: OutlinedButton(
+      onPressed: onRetry,
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: CkColors.line),
+        foregroundColor: CkColors.ink,
+      ),
+      child: const Text('Try again'),
+    ),
+  );
 }
 
 class _Notice extends StatelessWidget {

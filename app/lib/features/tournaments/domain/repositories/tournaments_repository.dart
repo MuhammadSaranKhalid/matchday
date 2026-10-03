@@ -167,12 +167,7 @@ abstract class TournamentsRepository {
   /// Adds a player (claimed or unclaimed) to a tournament entry squad.
   ///
   /// [expectedRevision] must equal [TournamentEntry.squadRevision].
-  Future<
-      Either<
-        Failure,
-        ({String squadMemberId, int squadRevision})
-      >
-    >
+  Future<Either<Failure, ({String squadMemberId, int squadRevision})>>
   addSquadMember({
     required String entryId,
     required int expectedRevision,
@@ -205,7 +200,7 @@ abstract class TournamentsRepository {
   /// Voids a recorded payment receipt.
   Future<Either<Failure, void>> voidPayment({
     required String paymentId,
-    String? voidReason,
+    required String voidReason,
   });
 
   // Fixtures, Bracket & Standings
@@ -341,12 +336,15 @@ abstract class TournamentsRepository {
     String tournamentId,
   );
 
-  /// Records a payment receipt for one tournament entry. A set, not
-  /// an increment: the sheet shows the running total and the organiser
-  /// confirms the new figure, so a mistyped entry is fixed by re-recording.
+  /// Appends one payment event for a Tournament Entry.
+  ///
+  /// [amountReceived] is money received in this specific transaction.
+  /// It is NOT the cumulative amount previously paid by the team.
+  ///
+  /// Payment history is append-only. Corrections use [voidPayment].
   Future<Either<Failure, Unit>> recordPayment({
     required String entryId,
-    required double amountPaid,
+    required double amountReceived,
     PaymentChannel? channel,
     String? reference,
   });

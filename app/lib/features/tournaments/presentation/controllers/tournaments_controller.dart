@@ -574,7 +574,7 @@ class TournamentsController extends _$TournamentsController {
   Future<bool> recordPayment({
     required String tournamentId,
     required String entryId,
-    required double amountPaid,
+    required double amountReceived,
     PaymentChannel? channel,
     String? reference,
   }) async {
@@ -582,7 +582,7 @@ class TournamentsController extends _$TournamentsController {
       tournamentId,
       (repo) => repo.recordPayment(
         entryId: entryId,
-        amountPaid: amountPaid,
+        amountReceived: amountReceived,
         channel: channel,
         reference: reference,
       ),
@@ -598,7 +598,7 @@ class TournamentsController extends _$TournamentsController {
   Future<bool> voidPayment({
     required String tournamentId,
     required String paymentId,
-    String? voidReason,
+    required String voidReason,
   }) async {
     final ok = await _run(
       tournamentId,

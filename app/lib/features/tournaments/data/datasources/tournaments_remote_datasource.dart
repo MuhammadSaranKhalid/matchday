@@ -497,10 +497,18 @@ class TournamentsRemoteDataSource {
   }
 
   /// Withdraws an accepted Entry after approval.
-  Future<void> withdrawEntry(String entryId, {String? reason}) async {
+  Future<void> withdrawEntry(
+    String entryId, {
+    required int expectedRevision,
+    String? reason,
+  }) async {
     await _backend(
       '/api/v1/tournament-entries/$entryId/withdraw',
-      body: {'commandId': _uuid.v4(), if (reason != null) 'reason': reason},
+      body: {
+        'commandId': _uuid.v4(),
+        'expectedRevision': expectedRevision,
+        if (reason != null) 'reason': reason,
+      },
     );
   }
 
@@ -556,6 +564,7 @@ class TournamentsRemoteDataSource {
 
   Future<String> addSquadMember({
     required String entryId,
+    required int expectedRevision,
     String? userId,
     String? unclaimedId,
   }) async {
@@ -563,6 +572,7 @@ class TournamentsRemoteDataSource {
       '/api/v1/tournament-entries/$entryId/squad-members',
       body: {
         'commandId': _uuid.v4(),
+        'expectedRevision': expectedRevision,
         if (userId != null) 'userId': userId,
         if (unclaimedId != null) 'unclaimedId': unclaimedId,
       },
@@ -583,19 +593,27 @@ class TournamentsRemoteDataSource {
 
   Future<void> removeSquadMember({
     required String squadMemberId,
+    required int expectedRevision,
     String? reason,
   }) async {
     await _backend(
       '/api/v1/tournament-squad-members/$squadMemberId/remove',
-      body: {'commandId': _uuid.v4(), if (reason != null) 'reason': reason},
+      body: {
+        'commandId': _uuid.v4(),
+        'expectedRevision': expectedRevision,
+        if (reason != null) 'reason': reason,
+      },
     );
   }
 
   /// Freezes the squad for a tournament entry — locks the squad list.
-  Future<void> freezeSquad(String entryId) async {
+  Future<void> freezeSquad(
+    String entryId, {
+    required int expectedRevision,
+  }) async {
     await _backend(
       '/api/v1/tournament-entries/$entryId/squad/freeze',
-      body: {'commandId': _uuid.v4()},
+      body: {'commandId': _uuid.v4(), 'expectedRevision': expectedRevision},
     );
   }
 

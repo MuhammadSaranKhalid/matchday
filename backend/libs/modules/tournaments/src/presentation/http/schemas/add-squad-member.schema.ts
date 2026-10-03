@@ -6,13 +6,20 @@ export const addSquadMemberSchema = z
     commandId: uuidSchema,
     userId: uuidSchema.optional(),
     unclaimedId: uuidSchema.optional(),
-    expectedRevision: z.number().int().positive().optional(),
+
+    // Optimistic concurrency token for this Entry's squad.
+    expectedRevision: z.number().int().min(1),
   })
   .refine(
     (data) =>
       (Boolean(data.userId) && !data.unclaimedId) ||
       (Boolean(data.unclaimedId) && !data.userId),
-    { message: 'Squad member must specify exactly one of userId or unclaimedId' },
+    {
+      message:
+        'Squad member must specify exactly one of userId or unclaimedId',
+    },
   );
 
-export type AddSquadMemberBody = z.infer<typeof addSquadMemberSchema>;
+export type AddSquadMemberBody = z.infer<
+  typeof addSquadMemberSchema
+>;

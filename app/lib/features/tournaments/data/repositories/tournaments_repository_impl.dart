@@ -255,10 +255,15 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, void>> withdrawEntry(
     String entryId, {
+    required int expectedRevision,
     String? reason,
   }) async {
     try {
-      await _remote.withdrawEntry(entryId, reason: reason);
+      await _remote.withdrawEntry(
+        entryId,
+        expectedRevision: expectedRevision,
+        reason: reason,
+      );
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
@@ -298,12 +303,14 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, String>> addSquadMember({
     required String entryId,
+    required int expectedRevision,
     String? userId,
     String? unclaimedId,
   }) async {
     try {
       final memberId = await _remote.addSquadMember(
         entryId: entryId,
+        expectedRevision: expectedRevision,
         userId: userId,
         unclaimedId: unclaimedId,
       );
@@ -318,11 +325,13 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   @override
   Future<Either<Failure, void>> removeSquadMember({
     required String squadMemberId,
+    required int expectedRevision,
     String? reason,
   }) async {
     try {
       await _remote.removeSquadMember(
         squadMemberId: squadMemberId,
+        expectedRevision: expectedRevision,
         reason: reason,
       );
       return const Right(null);
@@ -334,9 +343,12 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> freezeSquad(String entryId) async {
+  Future<Either<Failure, void>> freezeSquad(
+    String entryId, {
+    required int expectedRevision,
+  }) async {
     try {
-      await _remote.freezeSquad(entryId);
+      await _remote.freezeSquad(entryId, expectedRevision: expectedRevision);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

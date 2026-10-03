@@ -282,11 +282,16 @@ class TournamentsController extends _$TournamentsController {
   Future<bool> withdrawEntry(
     String tournamentId,
     String entryId, {
+    required int expectedRevision,
     String? reason,
   }) async {
     state = const AsyncLoading();
     final repo = ref.read(tournamentsRepositoryProvider);
-    final result = await repo.withdrawEntry(entryId, reason: reason);
+    final result = await repo.withdrawEntry(
+      entryId,
+      expectedRevision: expectedRevision,
+      reason: reason,
+    );
     return result.fold(
       (failure) {
         _fail(failure);
@@ -682,4 +687,101 @@ class TournamentsController extends _$TournamentsController {
       batsFirstTeamId: batsFirstTeamId,
     ),
   );
+  // ─── Squad mutations ──────────────────────────────────────────────────────
+
+  /// Adds a claimed or unclaimed roster player to an entry's squad.
+  ///
+  /// [expectedRevision] must equal [TournamentEntry.squadRevision] read
+  /// from the current provider state immediately before this call.
+  /// Returns the new squadMemberId on success, or null on failure.
+  Future<String?> addSquadMember({
+    required String tournamentId,
+    required String entryId,
+    required int expectedRevision,
+    String? userId,
+    String? unclaimedId,
+  }) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.addSquadMember(
+      entryId: entryId,
+      expectedRevision: expectedRevision,
+      userId: userId,
+      unclaimedId: unclaimedId,
+    );
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return null;
+      },
+      (memberId) {
+        _ok();
+        _refresh(() {
+          ref.invalidate(tournamentParticipantsProvider(tournamentId));
+        });
+        return memberId;
+      },
+    );
+  }
+
+  /// Removes a squad member from an entry's squad.
+  ///
+  /// [expectedRevision] must equal [TournamentEntry.squadRevision].
+  Future<bool> removeSquadMember({
+    required String tournamentId,
+    required String entryId,
+    required String squadMemberId,
+    required int expectedRevision,
+    String? reason,
+  }) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.removeSquadMember(
+      squadMemberId: squadMemberId,
+      expectedRevision: expectedRevision,
+      reason: reason,
+    );
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return false;
+      },
+      (_) {
+        _ok();
+        _refresh(() {
+          ref.invalidate(tournamentParticipantsProvider(tournamentId));
+        });
+        return true;
+      },
+    );
+  }
+
+  /// Freezes the squad for an entry — no further add/remove is permitted.
+  ///
+  /// [expectedRevision] must equal [TournamentEntry.squadRevision].
+  Future<bool> freezeSquad({
+    required String tournamentId,
+    required String entryId,
+    required int expectedRevision,
+  }) async {
+    state = const AsyncLoading();
+    final repo = ref.read(tournamentsRepositoryProvider);
+    final result = await repo.freezeSquad(
+      entryId,
+      expectedRevision: expectedRevision,
+    );
+    return result.fold(
+      (failure) {
+        _fail(failure);
+        return false;
+      },
+      (_) {
+        _ok();
+        _refresh(() {
+          ref.invalidate(tournamentParticipantsProvider(tournamentId));
+        });
+        return true;
+      },
+    );
+  }
 }

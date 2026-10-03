@@ -4,7 +4,11 @@ import { uuidSchema } from './participation-response.schema.js';
 export const removeSquadMemberSchema = z.strictObject({
   commandId: uuidSchema,
   reason: z.string().trim().max(500).optional(),
-  expectedRevision: z.number().int().positive().optional(),
+
+  // Optimistic concurrency token for this Entry's squad.
+  expectedRevision: z.number().int().min(1),
 });
 
-export type RemoveSquadMemberBody = z.infer<typeof removeSquadMemberSchema>;
+export type RemoveSquadMemberBody = z.infer<
+  typeof removeSquadMemberSchema
+>;

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament_registration.dart';
 import 'package:matchday/features/tournaments/domain/repositories/tournaments_repository.dart';

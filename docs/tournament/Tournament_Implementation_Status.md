@@ -336,10 +336,11 @@ The implementation program follows a strict 19-phase sequential progression. No 
   - Support explicit slot sources (`seed`, `winner`, `loser`, `group_rank`, `bye`).
 - **Phase 5: NestJS Tournament Command Infrastructure**
   - Scaffold NestJS Tournament command execution framework (`TournamentsModule`) with command envelope, actor validation via `request.jwt.claims`, `commandId` idempotency receipts (`private.tournament_command_receipts`), transaction-scoped advisory locks, and pure optimistic aggregate revision checks.
-- **Phase 6: Participation Commands Migration [COMPLETE]**
-  - Implement server commands: `RegisterTeam`, `ApproveRegistration`, `RejectRegistration`, `WithdrawPendingRegistration`, `WithdrawTournamentEntry`, `FreezeSquad`.
-  - HTTP presentation layer, Zod validation schemas, NestJS module DI wiring, unit tests, and E2E tests complete.
-  - Route Flutter participation actions to NestJS Tournament API.
+- **Phase 6: Participation Commands Migration [COMPLETED]**
+  - Implement server commands: `RegisterTeam`, `ApproveRegistration`, `RejectRegistration`, `WithdrawPendingRegistration`, `WithdrawTournamentEntry`, `FreezeSquad`, `AddSquadMember`, `RemoveSquadMember`, `RecordEntryPayment`, `VoidEntryPayment`.
+  - HTTP presentation layer (`TournamentsParticipationController`), Zod validation schemas, NestJS module DI wiring, Flutter NestJS command transport cutover via `TournamentsRemoteDataSource` authenticated HTTP commands.
+  - Database migrations `20261003000100_phase6_1_participation_cutover.sql` (retiring legacy RPCs) and `20261003000200_fee_ledger_add_entry_id.sql` (exposing `entry_id` for command routing).
+  - All quality gates verified: Flutter analysis (0 issues), architecture invariants test (100% pass), domain purity check (clean), Flutter tournaments tests (194/194 pass), and NestJS Vitest suite (243/243 pass).
 - **Phase 7: Competition Generators & Draw Publication**
   - Implement server-side draw generation and atomic `PublishDraw` command for Knockout, Round Robin, and Group + Knockout.
   - Validate graph acyclicity, slot sources, and bye advancements prior to publication commit.

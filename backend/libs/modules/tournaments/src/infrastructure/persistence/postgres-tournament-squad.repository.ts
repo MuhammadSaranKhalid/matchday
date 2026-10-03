@@ -163,8 +163,7 @@ export class PostgresTournamentSquadRepository implements TournamentSquadReposit
     await tx.query(
       `INSERT INTO public.tournament_squad_members
         (entry_id, tournament_id, added_by, user_id, unclaimed_id, membership_status)
-       VALUES ${valuePlaceholders.join(', ')}
-       ON CONFLICT DO NOTHING`,
+       VALUES ${valuePlaceholders.join(', ')}`,
       queryParams,
     );
   }

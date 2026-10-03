@@ -161,8 +161,17 @@ abstract class TournamentsRepository {
     String? reason,
   });
 
+  /// Freezes the squad of a tournament entry so no further changes can be made.
+  Future<Either<Failure, void>> freezeSquad(String entryId);
+
   /// Canonical query for payment ledger history of a tournament entry.
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(String entryId);
+
+  /// Voids a recorded payment receipt.
+  Future<Either<Failure, void>> voidPayment({
+    required String paymentId,
+    String? voidReason,
+  });
 
   // Fixtures, Bracket & Standings
   Future<Either<Failure, List<Match>>> getTournamentFixtures(
@@ -299,11 +308,11 @@ abstract class TournamentsRepository {
     String tournamentId,
   );
 
-  /// Records the cumulative amount received for one registration. A set, not
+  /// Records a payment receipt for one tournament entry. A set, not
   /// an increment: the sheet shows the running total and the organiser
   /// confirms the new figure, so a mistyped entry is fixed by re-recording.
   Future<Either<Failure, Unit>> recordPayment({
-    required String registrationId,
+    required String entryId,
     required double amountPaid,
     PaymentChannel? channel,
     String? reference,

@@ -7,7 +7,6 @@ import type {
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-command.ports.js';
 import type {
   TeamAuthorizationRepository,
-  TournamentAuthorizationRepository,
   TournamentRegistrationRepository,
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-repository.ports.js';
 import type { WithdrawPendingRegistrationCommand } from '../../../libs/modules/tournaments/src/domain/command/participation-commands.js';
@@ -34,8 +33,7 @@ describe('WithdrawPendingRegistrationHandler', () => {
   const registrationId = '77777777-7777-4000-8000-777777777777';
   const teamId = '33333333-3333-4000-8000-333333333333';
 
-  let tournamentAuthRepo: { can: ReturnType<typeof vi.fn> };
-  let teamAuthRepo: { can: ReturnType<typeof vi.fn> };
+  let teamAuthRepo: { require: ReturnType<typeof vi.fn> };
   let registrationRepo: {
     lockRegistration: ReturnType<typeof vi.fn>;
     withdrawRegistration: ReturnType<typeof vi.fn>;
@@ -46,18 +44,15 @@ describe('WithdrawPendingRegistrationHandler', () => {
   const command: WithdrawPendingRegistrationCommand = {
     commandId: context.commandId,
     action: 'tournament.registration.withdraw_pending',
-    resources: { tournamentId, registrationId },
+    resources: { registrationId },
     payload: {
       reason: 'Schedule conflict',
     },
   };
 
   beforeEach(() => {
-    tournamentAuthRepo = {
-      can: vi.fn().mockResolvedValue(false),
-    };
     teamAuthRepo = {
-      can: vi.fn().mockResolvedValue(true),
+      require: vi.fn().mockResolvedValue(undefined),
     };
     registrationRepo = {
       lockRegistration: vi.fn().mockResolvedValue({
@@ -79,7 +74,6 @@ describe('WithdrawPendingRegistrationHandler', () => {
     };
 
     handler = new WithdrawPendingRegistrationHandler(
-      tournamentAuthRepo as unknown as TournamentAuthorizationRepository,
       teamAuthRepo as unknown as TeamAuthorizationRepository,
       registrationRepo as unknown as TournamentRegistrationRepository,
     );
@@ -92,6 +86,15 @@ describe('WithdrawPendingRegistrationHandler', () => {
       registrationId,
       status: 'withdrawn',
     });
+    expect(registrationRepo.lockRegistration).toHaveBeenCalledWith(
+      tx,
+      registrationId,
+    );
+    expect(teamAuthRepo.require).toHaveBeenCalledWith(
+      tx,
+      teamId,
+      'team.tournament.enter',
+    );
     expect(registrationRepo.withdrawRegistration).toHaveBeenCalledWith(tx, {
       registrationId,
       withdrawnBy: principal.userId,
@@ -99,21 +102,10 @@ describe('WithdrawPendingRegistrationHandler', () => {
     });
   });
 
-  it('withdraws registration as tournament authority successfully', async () => {
-    teamAuthRepo.can.mockResolvedValueOnce(false);
-    tournamentAuthRepo.can.mockResolvedValueOnce(true);
-
-    const result = await handler.execute(context, command);
-
-    expect(result).toEqual({
-      registrationId,
-      status: 'withdrawn',
-    });
-  });
-
-  it('fails if actor is neither team authority nor tournament authority', async () => {
-    teamAuthRepo.can.mockResolvedValueOnce(false);
-    tournamentAuthRepo.can.mockResolvedValueOnce(false);
+  it('fails if actor is not team authority', async () => {
+    teamAuthRepo.require.mockRejectedValueOnce(
+      TournamentError.forbidden('Forbidden'),
+    );
 
     try {
       await handler.execute(context, command);
@@ -124,19 +116,6 @@ describe('WithdrawPendingRegistrationHandler', () => {
         TOURNAMENT_ERROR_CODES.FORBIDDEN,
       );
     }
-  });
-
-  it('fails if registration belongs to another tournament', async () => {
-    registrationRepo.lockRegistration.mockResolvedValueOnce({
-      registrationId,
-      tournamentId: 'another-tournament',
-      teamId,
-      status: 'pending',
-    });
-
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
   });
 
   it('fails if registration is already approved', async () => {

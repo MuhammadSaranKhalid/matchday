@@ -38,7 +38,10 @@ describe('ApproveRegistrationHandler', () => {
   const teamId = '33333333-3333-4000-8000-333333333333';
   const entryId = '88888888-8888-4000-8000-888888888888';
 
-  let rootRepo: { lockTournament: ReturnType<typeof vi.fn> };
+  let rootRepo: {
+    lockTournament: ReturnType<typeof vi.fn>;
+    findTournament: ReturnType<typeof vi.fn>;
+  };
   let tournamentAuthRepo: { require: ReturnType<typeof vi.fn> };
   let registrationRepo: {
     lockRegistration: ReturnType<typeof vi.fn>;
@@ -52,6 +55,8 @@ describe('ApproveRegistrationHandler', () => {
   };
   let squadRepo: {
     materializeSquadFromProposal: ReturnType<typeof vi.fn>;
+    isPlayerInActiveTeamRoster: ReturnType<typeof vi.fn>;
+    isPlayerInActiveTournamentSquad: ReturnType<typeof vi.fn>;
   };
 
   let handler: ApproveRegistrationHandler;
@@ -74,16 +79,21 @@ describe('ApproveRegistrationHandler', () => {
     entryFee: 100,
   };
 
+  // Resource-oriented: only registrationId in resources; tournamentId is derived
   const command: ApproveRegistrationCommand = {
     commandId: context.commandId,
     action: 'tournament.registration.approve',
-    resources: { tournamentId, registrationId },
+    resources: { registrationId },
     payload: {},
   };
 
   beforeEach(() => {
     rootRepo = {
       lockTournament: vi.fn().mockResolvedValue({ ...validTournamentSnapshot }),
+      // findTournament is called after approval to read the updated entry_revision
+      findTournament: vi
+        .fn()
+        .mockResolvedValue({ ...validTournamentSnapshot, entryRevision: 4 }),
     };
     tournamentAuthRepo = {
       require: vi.fn().mockResolvedValue(undefined),
@@ -137,6 +147,8 @@ describe('ApproveRegistrationHandler', () => {
     };
     squadRepo = {
       materializeSquadFromProposal: vi.fn().mockResolvedValue(1),
+      isPlayerInActiveTeamRoster: vi.fn().mockResolvedValue(true),
+      isPlayerInActiveTournamentSquad: vi.fn().mockResolvedValue(false),
     };
 
     handler = new ApproveRegistrationHandler(
@@ -180,19 +192,6 @@ describe('ApproveRegistrationHandler', () => {
     expect(squadRepo.materializeSquadFromProposal).toHaveBeenCalled();
   });
 
-  it('rejects approval if registration belongs to another tournament', async () => {
-    registrationRepo.lockRegistration.mockResolvedValueOnce({
-      registrationId,
-      tournamentId: 'other-tournament',
-      teamId,
-      status: 'pending',
-    });
-
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
-  });
-
   it('rejects approval if registration is not in pending status', async () => {
     registrationRepo.lockRegistration.mockResolvedValueOnce({
       registrationId,
@@ -232,6 +231,10 @@ describe('ApproveRegistrationHandler', () => {
   });
 
   it('rejects approval if tournament capacity has been reached', async () => {
+    rootRepo.lockTournament.mockResolvedValueOnce({
+      ...validTournamentSnapshot,
+      maxTeams: 8,
+    });
     entryRepo.countActiveEntries.mockResolvedValueOnce(8);
 
     try {
@@ -241,6 +244,37 @@ describe('ApproveRegistrationHandler', () => {
       expect(error).toBeInstanceOf(TournamentError);
       expect((error as TournamentError).code).toBe(
         TOURNAMENT_ERROR_CODES.CAPACITY_REACHED,
+      );
+    }
+  });
+
+  it('rejects approval if proposed squad member is no longer on team roster', async () => {
+    squadRepo.isPlayerInActiveTeamRoster.mockResolvedValueOnce(false);
+
+    try {
+      await handler.execute(context, command);
+      expect.fail('Should have thrown rule violation');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.RULE_VIOLATION,
+      );
+    }
+  });
+
+  it('rejects approval if entry set is locked', async () => {
+    rootRepo.lockTournament.mockResolvedValueOnce({
+      ...validTournamentSnapshot,
+      entryState: 'locked',
+    });
+
+    try {
+      await handler.execute(context, command);
+      expect.fail('Should have thrown invalid state');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.INVALID_STATE,
       );
     }
   });

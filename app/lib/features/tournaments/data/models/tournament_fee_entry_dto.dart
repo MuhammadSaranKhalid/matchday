@@ -20,6 +20,8 @@ class TournamentFeeEntryDto {
   }
 
   TournamentFeeEntry toEntity() => TournamentFeeEntry(
+        entryId: (_row['entry_id'] as String?) ??
+            (_row['registration_id'] as String),
         registrationId: _row['registration_id'] as String,
         teamId: _row['team_id'] as String,
         teamName: _row['team_name'] as String? ?? 'Unknown team',

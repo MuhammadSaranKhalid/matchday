@@ -8,9 +8,9 @@ export const proposedSquadMemberSchema = z
   })
   .refine(
     (data) =>
-      (data.userId !== undefined && data.userId !== null) ||
-      (data.unclaimedId !== undefined && data.unclaimedId !== null),
-    { message: 'Proposed squad member must specify either userId or unclaimedId' },
+      (Boolean(data.userId) && !data.unclaimedId) ||
+      (Boolean(data.unclaimedId) && !data.userId),
+    { message: 'Proposed squad member must specify exactly one of userId or unclaimedId' },
   );
 
 export const registerTeamSchema = z.strictObject({

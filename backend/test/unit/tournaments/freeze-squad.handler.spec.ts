@@ -6,7 +6,6 @@ import type {
   TournamentCommandContext,
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-command.ports.js';
 import type {
-  TeamAuthorizationRepository,
   TournamentAuthorizationRepository,
   TournamentEntryRepository,
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-repository.ports.js';
@@ -34,8 +33,7 @@ describe('FreezeSquadHandler', () => {
   const entryId = '88888888-8888-4000-8000-888888888888';
   const teamId = '33333333-3333-4000-8000-333333333333';
 
-  let tournamentAuthRepo: { can: ReturnType<typeof vi.fn> };
-  let teamAuthRepo: { can: ReturnType<typeof vi.fn> };
+  let tournamentAuthRepo: { require: ReturnType<typeof vi.fn> };
   let entryRepo: {
     lockEntry: ReturnType<typeof vi.fn>;
     freezeSquad: ReturnType<typeof vi.fn>;
@@ -46,17 +44,14 @@ describe('FreezeSquadHandler', () => {
   const command: FreezeSquadCommand = {
     commandId: context.commandId,
     action: 'tournament.entry.freeze_squad',
-    resources: { tournamentId, entryId },
+    resources: { entryId },
     expectedRevision: 2,
     payload: {},
   };
 
   beforeEach(() => {
     tournamentAuthRepo = {
-      can: vi.fn().mockResolvedValue(true),
-    };
-    teamAuthRepo = {
-      can: vi.fn().mockResolvedValue(false),
+      require: vi.fn().mockResolvedValue(undefined),
     };
     entryRepo = {
       lockEntry: vi.fn().mockResolvedValue({
@@ -79,7 +74,6 @@ describe('FreezeSquadHandler', () => {
 
     handler = new FreezeSquadHandler(
       tournamentAuthRepo as unknown as TournamentAuthorizationRepository,
-      teamAuthRepo as unknown as TeamAuthorizationRepository,
       entryRepo as unknown as TournamentEntryRepository,
     );
   });
@@ -93,25 +87,15 @@ describe('FreezeSquadHandler', () => {
       squadRevision: 3,
     });
     expect(entryRepo.lockEntry).toHaveBeenCalledWith(tx, entryId);
+    expect(tournamentAuthRepo.require).toHaveBeenCalledWith(
+      tx,
+      tournamentId,
+      'tournament.squad.review',
+    );
     expect(entryRepo.freezeSquad).toHaveBeenCalledWith(tx, {
       entryId,
       expectedRevision: 2,
     });
-  });
-
-  it('fails if entry does not belong to tournament', async () => {
-    entryRepo.lockEntry.mockResolvedValueOnce({
-      entryId,
-      tournamentId: 'another-tournament',
-      teamId,
-      status: 'active',
-      squadState: 'editable',
-      squadRevision: 2,
-    });
-
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
   });
 
   it('fails if entry is not active', async () => {
@@ -156,9 +140,10 @@ describe('FreezeSquadHandler', () => {
     }
   });
 
-  it('fails if actor has neither team authority nor entries.lock capability', async () => {
-    tournamentAuthRepo.can.mockResolvedValueOnce(false);
-    teamAuthRepo.can.mockResolvedValueOnce(false);
+  it('fails if actor lacks tournament squad review capability', async () => {
+    tournamentAuthRepo.require.mockRejectedValueOnce(
+      TournamentError.forbidden('Forbidden'),
+    );
 
     try {
       await handler.execute(context, command);
@@ -167,6 +152,23 @@ describe('FreezeSquadHandler', () => {
       expect(error).toBeInstanceOf(TournamentError);
       expect((error as TournamentError).code).toBe(
         TOURNAMENT_ERROR_CODES.FORBIDDEN,
+      );
+    }
+  });
+
+  it('fails if expected revision does not match', async () => {
+    const staleCommand: FreezeSquadCommand = {
+      ...command,
+      expectedRevision: 1, // entry has squadRevision: 2
+    };
+
+    try {
+      await handler.execute(context, staleCommand);
+      expect.fail('Should have thrown conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.STALE_REVISION,
       );
     }
   });

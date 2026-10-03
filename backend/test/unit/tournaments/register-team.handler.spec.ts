@@ -12,6 +12,7 @@ import type {
   TournamentRegistrationRepository,
   TournamentRootRepository,
   TournamentRootSnapshot,
+  TournamentSquadRepository,
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-repository.ports.js';
 import type { RegisterTeamCommand } from '../../../libs/modules/tournaments/src/domain/command/participation-commands.js';
 import {
@@ -26,7 +27,11 @@ describe('RegisterTeamHandler', () => {
     appMetadata: {},
   };
 
-  const tx = {} as CommandQueryExecutor;
+  // tx must expose `query` because the deadline check uses tx.query directly
+  const tx = {
+    query: vi.fn().mockResolvedValue({ rows: [{ is_passed: false }] }),
+  } as unknown as CommandQueryExecutor;
+
   const context: TournamentCommandContext = {
     tx,
     principal,
@@ -42,9 +47,13 @@ describe('RegisterTeamHandler', () => {
     createRegistration: ReturnType<typeof vi.fn>;
     createProposalMembers: ReturnType<typeof vi.fn>;
   };
-  let entryRepo: { countActiveEntries: ReturnType<typeof vi.fn> };
+  let entryRepo: {
+    findActiveEntryByTeam: ReturnType<typeof vi.fn>;
+    countActiveEntries: ReturnType<typeof vi.fn>;
+  };
   let teamRepo: { findTeam: ReturnType<typeof vi.fn> };
   let teamAuthRepo: { require: ReturnType<typeof vi.fn> };
+  let squadRepo: { isPlayerInActiveTeamRoster: ReturnType<typeof vi.fn> };
 
   let handler: RegisterTeamHandler;
 
@@ -80,6 +89,10 @@ describe('RegisterTeamHandler', () => {
   };
 
   beforeEach(() => {
+    (tx as { query: ReturnType<typeof vi.fn> }).query = vi
+      .fn()
+      .mockResolvedValue({ rows: [{ is_passed: false }] });
+
     rootRepo = {
       lockTournament: vi.fn().mockResolvedValue({ ...validTournamentSnapshot }),
     };
@@ -91,6 +104,7 @@ describe('RegisterTeamHandler', () => {
       createProposalMembers: vi.fn().mockResolvedValue(undefined),
     };
     entryRepo = {
+      findActiveEntryByTeam: vi.fn().mockResolvedValue(null),
       countActiveEntries: vi.fn().mockResolvedValue(2),
     };
     teamRepo = {
@@ -104,6 +118,10 @@ describe('RegisterTeamHandler', () => {
     teamAuthRepo = {
       require: vi.fn().mockResolvedValue(undefined),
     };
+    squadRepo = {
+      // proposal member active-roster check: succeed by default
+      isPlayerInActiveTeamRoster: vi.fn().mockResolvedValue(true),
+    };
 
     handler = new RegisterTeamHandler(
       rootRepo as unknown as TournamentRootRepository,
@@ -111,6 +129,7 @@ describe('RegisterTeamHandler', () => {
       entryRepo as unknown as TournamentEntryRepository,
       teamRepo as unknown as TeamTournamentRepository,
       teamAuthRepo as unknown as TeamAuthorizationRepository,
+      squadRepo as unknown as TournamentSquadRepository,
     );
   });
 
@@ -160,22 +179,33 @@ describe('RegisterTeamHandler', () => {
   });
 
   it('rejects registration if deadline has passed', async () => {
-    rootRepo.lockTournament.mockResolvedValueOnce({
-      ...validTournamentSnapshot,
-      registrationDeadline: '2020-01-01',
-    });
+    (tx as { query: ReturnType<typeof vi.fn> }).query = vi
+      .fn()
+      .mockResolvedValue({ rows: [{ is_passed: true }] });
 
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
+    try {
+      await handler.execute(context, command);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.INVALID_STATE,
+      );
+    }
   });
 
   it('rejects registration if team is not found', async () => {
     teamRepo.findTeam.mockResolvedValueOnce(null);
 
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
+    try {
+      await handler.execute(context, command);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.NOT_FOUND,
+      );
+    }
   });
 
   it('rejects registration if team is not active', async () => {
@@ -218,16 +248,21 @@ describe('RegisterTeamHandler', () => {
     }
   });
 
-  it('rejects registration if maximum team capacity is reached', async () => {
-    entryRepo.countActiveEntries.mockResolvedValueOnce(8);
+  it('rejects registration if team already has an active entry', async () => {
+    entryRepo.findActiveEntryByTeam.mockResolvedValueOnce({
+      entryId: '88888888-8888-4000-8000-888888888888',
+      tournamentId,
+      teamId,
+      status: 'active',
+    });
 
     try {
       await handler.execute(context, command);
-      expect.fail('Should have thrown capacity reached');
+      expect.fail('Should have thrown conflict');
     } catch (error) {
       expect(error).toBeInstanceOf(TournamentError);
       expect((error as TournamentError).code).toBe(
-        TOURNAMENT_ERROR_CODES.CAPACITY_REACHED,
+        TOURNAMENT_ERROR_CODES.CONFLICT,
       );
     }
   });

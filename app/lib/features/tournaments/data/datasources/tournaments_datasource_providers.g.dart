@@ -56,7 +56,7 @@ final class TournamentsRemoteDataSourceProvider
 }
 
 String _$tournamentsRemoteDataSourceHash() =>
-    r'775e1a7e054cc8e40c8a22c2beaff50c8b0824b1';
+    r'fc87c566113912d5c2b6dac47f4d8fb09964bf1b';
 
 /// Returns the abstract type: the wizard and settings screen depend on the
 /// contract, not on the image_picker/cropper stack behind it.

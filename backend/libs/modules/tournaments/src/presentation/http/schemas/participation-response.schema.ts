@@ -67,6 +67,47 @@ export const freezeSquadResponseSchema = z.strictObject({
   status: z.enum(['executed', 'replayed']),
 });
 
+export const addSquadMemberResultSchema = z.strictObject({
+  squadMemberId: uuidSchema,
+  squadRevision: z.number().int(),
+});
+
+export const addSquadMemberResponseSchema = z.strictObject({
+  result: addSquadMemberResultSchema,
+  status: z.enum(['executed', 'replayed']),
+});
+
+export const removeSquadMemberResultSchema = z.strictObject({
+  squadMemberId: uuidSchema,
+  squadRevision: z.number().int(),
+});
+
+export const removeSquadMemberResponseSchema = z.strictObject({
+  result: removeSquadMemberResultSchema,
+  status: z.enum(['executed', 'replayed']),
+});
+
+export const recordEntryPaymentResultSchema = z.strictObject({
+  paymentId: uuidSchema,
+  entryId: uuidSchema,
+  amount: z.number().positive(),
+});
+
+export const recordEntryPaymentResponseSchema = z.strictObject({
+  result: recordEntryPaymentResultSchema,
+  status: z.enum(['executed', 'replayed']),
+});
+
+export const voidEntryPaymentResultSchema = z.strictObject({
+  paymentId: uuidSchema,
+  isVoid: z.literal(true),
+});
+
+export const voidEntryPaymentResponseSchema = z.strictObject({
+  result: voidEntryPaymentResultSchema,
+  status: z.enum(['executed', 'replayed']),
+});
+
 export type RegisterTeamResponseDto = z.infer<typeof registerTeamResponseSchema>;
 export type ApproveRegistrationResponseDto = z.infer<typeof approveRegistrationResponseSchema>;
 export type RejectRegistrationResponseDto = z.infer<typeof rejectRegistrationResponseSchema>;
@@ -77,3 +118,8 @@ export type WithdrawTournamentEntryResponseDto = z.infer<
   typeof withdrawTournamentEntryResponseSchema
 >;
 export type FreezeSquadResponseDto = z.infer<typeof freezeSquadResponseSchema>;
+export type AddSquadMemberResponseDto = z.infer<typeof addSquadMemberResponseSchema>;
+export type RemoveSquadMemberResponseDto = z.infer<typeof removeSquadMemberResponseSchema>;
+export type RecordEntryPaymentResponseDto = z.infer<typeof recordEntryPaymentResponseSchema>;
+export type VoidEntryPaymentResponseDto = z.infer<typeof voidEntryPaymentResponseSchema>;
+

@@ -7,8 +7,8 @@ import type {
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-command.ports.js';
 import type {
   TeamAuthorizationRepository,
-  TournamentAuthorizationRepository,
   TournamentEntryRepository,
+  TournamentRootRepository,
   TournamentSquadRepository,
 } from '../../../libs/modules/tournaments/src/application/ports/tournament-repository.ports.js';
 import type { WithdrawTournamentEntryCommand } from '../../../libs/modules/tournaments/src/domain/command/participation-commands.js';
@@ -35,8 +35,13 @@ describe('WithdrawTournamentEntryHandler', () => {
   const entryId = '88888888-8888-4000-8000-888888888888';
   const teamId = '33333333-3333-4000-8000-333333333333';
 
-  let tournamentAuthRepo: { can: ReturnType<typeof vi.fn> };
-  let teamAuthRepo: { can: ReturnType<typeof vi.fn> };
+  let rootRepo: {
+    lockTournament: ReturnType<typeof vi.fn>;
+    findTournament: ReturnType<typeof vi.fn>;
+  };
+  let teamAuthRepo: {
+    require: ReturnType<typeof vi.fn>;
+  };
   let entryRepo: {
     lockEntry: ReturnType<typeof vi.fn>;
     withdrawEntry: ReturnType<typeof vi.fn>;
@@ -50,18 +55,47 @@ describe('WithdrawTournamentEntryHandler', () => {
   const command: WithdrawTournamentEntryCommand = {
     commandId: context.commandId,
     action: 'tournament.entry.withdraw',
-    resources: { tournamentId, entryId },
+    resources: { entryId },
     payload: {
       reason: 'Team injury crisis',
     },
   };
 
   beforeEach(() => {
-    tournamentAuthRepo = {
-      can: vi.fn().mockResolvedValue(false),
+    rootRepo = {
+      lockTournament: vi.fn().mockResolvedValue({
+        tournamentId,
+        sportId: 'cricket',
+        ownerUserId: '00000000-0000-4000-8000-000000000000',
+        publicationState: 'published',
+        terminationState: 'none',
+        registrationState: 'open',
+        registrationDeadline: null,
+        entryState: 'editable',
+        fixtureState: 'draft',
+        maxTeams: 8,
+        minTeams: 2,
+        entryRevision: 2,
+        fixtureRevision: 1,
+      }),
+      findTournament: vi.fn().mockResolvedValue({
+        tournamentId,
+        sportId: 'cricket',
+        ownerUserId: '00000000-0000-4000-8000-000000000000',
+        publicationState: 'published',
+        terminationState: 'none',
+        registrationState: 'open',
+        registrationDeadline: null,
+        entryState: 'editable',
+        fixtureState: 'draft',
+        maxTeams: 8,
+        minTeams: 2,
+        entryRevision: 3,
+        fixtureRevision: 1,
+      }),
     };
     teamAuthRepo = {
-      can: vi.fn().mockResolvedValue(true),
+      require: vi.fn().mockResolvedValue(undefined),
     };
     entryRepo = {
       lockEntry: vi.fn().mockResolvedValue({
@@ -82,7 +116,6 @@ describe('WithdrawTournamentEntryHandler', () => {
       withdrawEntry: vi.fn().mockResolvedValue({
         entryId,
         status: 'withdrawn',
-        squadRevision: 3,
       }),
     };
     squadRepo = {
@@ -90,7 +123,7 @@ describe('WithdrawTournamentEntryHandler', () => {
     };
 
     handler = new WithdrawTournamentEntryHandler(
-      tournamentAuthRepo as unknown as TournamentAuthorizationRepository,
+      rootRepo as unknown as TournamentRootRepository,
       teamAuthRepo as unknown as TeamAuthorizationRepository,
       entryRepo as unknown as TournamentEntryRepository,
       squadRepo as unknown as TournamentSquadRepository,
@@ -106,6 +139,12 @@ describe('WithdrawTournamentEntryHandler', () => {
       entryRevision: 3,
     });
     expect(entryRepo.lockEntry).toHaveBeenCalledWith(tx, entryId);
+    expect(rootRepo.lockTournament).toHaveBeenCalledWith(tx, tournamentId);
+    expect(teamAuthRepo.require).toHaveBeenCalledWith(
+      tx,
+      teamId,
+      'team.tournament.enter',
+    );
     expect(squadRepo.removeAllActiveMembersForEntry).toHaveBeenCalledWith(tx, {
       entryId,
       removedBy: principal.userId,
@@ -116,19 +155,7 @@ describe('WithdrawTournamentEntryHandler', () => {
       withdrawnBy: principal.userId,
       withdrawalReason: 'Team injury crisis',
     });
-  });
-
-  it('fails if entry does not belong to tournament', async () => {
-    entryRepo.lockEntry.mockResolvedValueOnce({
-      entryId,
-      tournamentId: 'different-tournament',
-      teamId,
-      status: 'active',
-    });
-
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
+    expect(rootRepo.findTournament).toHaveBeenCalledWith(tx, tournamentId);
   });
 
   it('fails if entry is not active', async () => {
@@ -150,9 +177,38 @@ describe('WithdrawTournamentEntryHandler', () => {
     }
   });
 
-  it('fails if actor is neither team authority nor tournament manager', async () => {
-    teamAuthRepo.can.mockResolvedValueOnce(false);
-    tournamentAuthRepo.can.mockResolvedValueOnce(false);
+  it('fails if tournament entry state is not editable', async () => {
+    rootRepo.lockTournament.mockResolvedValueOnce({
+      tournamentId,
+      sportId: 'cricket',
+      ownerUserId: '00000000-0000-4000-8000-000000000000',
+      publicationState: 'published',
+      terminationState: 'none',
+      registrationState: 'open',
+      registrationDeadline: null,
+      entryState: 'frozen',
+      fixtureState: 'draft',
+      maxTeams: 8,
+      minTeams: 2,
+      entryRevision: 2,
+      fixtureRevision: 1,
+    });
+
+    try {
+      await handler.execute(context, command);
+      expect.fail('Should have thrown invalid state');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.INVALID_STATE,
+      );
+    }
+  });
+
+  it('fails if actor is not team authority', async () => {
+    teamAuthRepo.require.mockRejectedValueOnce(
+      TournamentError.forbidden('Forbidden'),
+    );
 
     try {
       await handler.execute(context, command);
@@ -161,6 +217,23 @@ describe('WithdrawTournamentEntryHandler', () => {
       expect(error).toBeInstanceOf(TournamentError);
       expect((error as TournamentError).code).toBe(
         TOURNAMENT_ERROR_CODES.FORBIDDEN,
+      );
+    }
+  });
+
+  it('fails if expected revision does not match', async () => {
+    const staleCommand: WithdrawTournamentEntryCommand = {
+      ...command,
+      expectedRevision: 1, // tournament has entryRevision: 2
+    };
+
+    try {
+      await handler.execute(context, staleCommand);
+      expect.fail('Should have thrown stale revision');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.STALE_REVISION,
       );
     }
   });

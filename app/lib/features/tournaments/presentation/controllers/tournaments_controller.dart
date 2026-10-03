@@ -556,7 +556,7 @@ class TournamentsController extends _$TournamentsController {
 
   Future<bool> recordPayment({
     required String tournamentId,
-    required String registrationId,
+    required String entryId,
     required double amountPaid,
     PaymentChannel? channel,
     String? reference,
@@ -564,7 +564,7 @@ class TournamentsController extends _$TournamentsController {
     final ok = await _run(
       tournamentId,
       (repo) => repo.recordPayment(
-        registrationId: registrationId,
+        entryId: entryId,
         amountPaid: amountPaid,
         channel: channel,
         reference: reference,
@@ -573,6 +573,25 @@ class TournamentsController extends _$TournamentsController {
     if (ok && ref.mounted) {
       ref.invalidate(tournamentFeeLedgerProvider(tournamentId));
       // The registrations tab shows the same "Paid" chip off payment_status.
+      ref.invalidate(tournamentRegistrationsProvider(tournamentId));
+    }
+    return ok;
+  }
+
+  Future<bool> voidPayment({
+    required String tournamentId,
+    required String paymentId,
+    String? voidReason,
+  }) async {
+    final ok = await _run(
+      tournamentId,
+      (repo) => repo.voidPayment(
+        paymentId: paymentId,
+        voidReason: voidReason,
+      ),
+    );
+    if (ok && ref.mounted) {
+      ref.invalidate(tournamentFeeLedgerProvider(tournamentId));
       ref.invalidate(tournamentRegistrationsProvider(tournamentId));
     }
     return ok;

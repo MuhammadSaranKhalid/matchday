@@ -5,10 +5,14 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedPrincipal } from '@shared-kernel/identity/authenticated-principal.js';
 import { TournamentCommandExecutor } from '../../libs/modules/tournaments/src/application/command-executor/tournament-command-executor.js';
+import { AddSquadMemberHandler } from '../../libs/modules/tournaments/src/application/handlers/add-squad-member.handler.js';
 import { ApproveRegistrationHandler } from '../../libs/modules/tournaments/src/application/handlers/approve-registration.handler.js';
 import { FreezeSquadHandler } from '../../libs/modules/tournaments/src/application/handlers/freeze-squad.handler.js';
+import { RecordEntryPaymentHandler } from '../../libs/modules/tournaments/src/application/handlers/record-entry-payment.handler.js';
 import { RegisterTeamHandler } from '../../libs/modules/tournaments/src/application/handlers/register-team.handler.js';
 import { RejectRegistrationHandler } from '../../libs/modules/tournaments/src/application/handlers/reject-registration.handler.js';
+import { RemoveSquadMemberHandler } from '../../libs/modules/tournaments/src/application/handlers/remove-squad-member.handler.js';
+import { VoidEntryPaymentHandler } from '../../libs/modules/tournaments/src/application/handlers/void-entry-payment.handler.js';
 import { WithdrawPendingRegistrationHandler } from '../../libs/modules/tournaments/src/application/handlers/withdraw-pending-registration.handler.js';
 import { WithdrawTournamentEntryHandler } from '../../libs/modules/tournaments/src/application/handlers/withdraw-tournament-entry.handler.js';
 import { TournamentsParticipationController } from '../../libs/modules/tournaments/src/presentation/http/tournaments-participation.controller.js';
@@ -27,7 +31,10 @@ const tournamentId = '20000000-0000-4000-8000-000000000001';
 const teamId = '30000000-0000-4000-8000-000000000001';
 const registrationId = '40000000-0000-4000-8000-000000000001';
 const entryId = '50000000-0000-4000-8000-000000000001';
-const commandId = '60000000-0000-4000-8000-000000000001';
+const squadMemberId = '60000000-0000-4000-8000-000000000001';
+const paymentId = '70000000-0000-4000-8000-000000000001';
+const memberUserId = '80000000-0000-4000-8000-000000000001';
+const commandId = '90000000-0000-4000-8000-000000000001';
 
 describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
   let app: INestApplication;
@@ -39,7 +46,11 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
   const withdrawPendingRegistrationHandler =
     {} as WithdrawPendingRegistrationHandler;
   const withdrawTournamentEntryHandler = {} as WithdrawTournamentEntryHandler;
+  const addSquadMemberHandler = {} as AddSquadMemberHandler;
+  const removeSquadMemberHandler = {} as RemoveSquadMemberHandler;
   const freezeSquadHandler = {} as FreezeSquadHandler;
+  const recordEntryPaymentHandler = {} as RecordEntryPaymentHandler;
+  const voidEntryPaymentHandler = {} as VoidEntryPaymentHandler;
 
   beforeEach(async () => {
     verifier.verify.mockResolvedValue(principal);
@@ -67,7 +78,23 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
           provide: WithdrawTournamentEntryHandler,
           useValue: withdrawTournamentEntryHandler,
         },
+        {
+          provide: AddSquadMemberHandler,
+          useValue: addSquadMemberHandler,
+        },
+        {
+          provide: RemoveSquadMemberHandler,
+          useValue: removeSquadMemberHandler,
+        },
         { provide: FreezeSquadHandler, useValue: freezeSquadHandler },
+        {
+          provide: RecordEntryPaymentHandler,
+          useValue: recordEntryPaymentHandler,
+        },
+        {
+          provide: VoidEntryPaymentHandler,
+          useValue: voidEntryPaymentHandler,
+        },
       ],
     }).compile();
 
@@ -78,7 +105,11 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
     await app.init();
   });
 
-  afterEach(async () => app.close());
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
 
   it('requires a valid bearer token for participation endpoints', async () => {
     await request(app.getHttpServer())
@@ -139,16 +170,14 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
     );
   });
 
-  it('approves registration via POST /tournaments/:tournamentId/registrations/:registrationId/approve', async () => {
+  it('approves registration via POST /tournament-registrations/:registrationId/approve', async () => {
     commandExecutor.execute.mockResolvedValueOnce({
       result: { registrationId, entryId, entryRevision: 2 },
       status: 'executed',
     });
 
     const response = await request(app.getHttpServer())
-      .post(
-        `/api/v1/tournaments/${tournamentId}/registrations/${registrationId}/approve`,
-      )
+      .post(`/api/v1/tournament-registrations/${registrationId}/approve`)
       .set('authorization', 'Bearer valid-token')
       .send({ commandId })
       .expect(201);
@@ -162,22 +191,20 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
       expect.objectContaining({
         commandId,
         action: 'tournament.registration.approve',
-        resources: { tournamentId, registrationId },
+        resources: { registrationId },
       }),
       approveRegistrationHandler,
     );
   });
 
-  it('rejects registration via POST /tournaments/:tournamentId/registrations/:registrationId/reject', async () => {
+  it('rejects registration via POST /tournament-registrations/:registrationId/reject', async () => {
     commandExecutor.execute.mockResolvedValueOnce({
       result: { registrationId, status: 'rejected' },
       status: 'executed',
     });
 
     const response = await request(app.getHttpServer())
-      .post(
-        `/api/v1/tournaments/${tournamentId}/registrations/${registrationId}/reject`,
-      )
+      .post(`/api/v1/tournament-registrations/${registrationId}/reject`)
       .set('authorization', 'Bearer valid-token')
       .send({ commandId, reason: 'Roster incomplete' })
       .expect(201);
@@ -191,23 +218,21 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
       expect.objectContaining({
         commandId,
         action: 'tournament.registration.reject',
-        resources: { tournamentId, registrationId },
+        resources: { registrationId },
         payload: { reason: 'Roster incomplete' },
       }),
       rejectRegistrationHandler,
     );
   });
 
-  it('withdraws registration via POST /tournaments/:tournamentId/registrations/:registrationId/withdraw', async () => {
+  it('withdraws registration via POST /tournament-registrations/:registrationId/withdraw', async () => {
     commandExecutor.execute.mockResolvedValueOnce({
       result: { registrationId, status: 'withdrawn' },
       status: 'executed',
     });
 
     const response = await request(app.getHttpServer())
-      .post(
-        `/api/v1/tournaments/${tournamentId}/registrations/${registrationId}/withdraw`,
-      )
+      .post(`/api/v1/tournament-registrations/${registrationId}/withdraw`)
       .set('authorization', 'Bearer valid-token')
       .send({ commandId, reason: 'Withdrawing application' })
       .expect(201);
@@ -221,21 +246,21 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
       expect.objectContaining({
         commandId,
         action: 'tournament.registration.withdraw_pending',
-        resources: { tournamentId, registrationId },
+        resources: { registrationId },
         payload: { reason: 'Withdrawing application' },
       }),
       withdrawPendingRegistrationHandler,
     );
   });
 
-  it('withdraws tournament entry via POST /tournaments/:tournamentId/entries/:entryId/withdraw', async () => {
+  it('withdraws tournament entry via POST /tournament-entries/:entryId/withdraw', async () => {
     commandExecutor.execute.mockResolvedValueOnce({
       result: { entryId, status: 'withdrawn', entryRevision: 3 },
       status: 'executed',
     });
 
     const response = await request(app.getHttpServer())
-      .post(`/api/v1/tournaments/${tournamentId}/entries/${entryId}/withdraw`)
+      .post(`/api/v1/tournament-entries/${entryId}/withdraw`)
       .set('authorization', 'Bearer valid-token')
       .send({ commandId, reason: 'Unable to travel', expectedRevision: 2 })
       .expect(201);
@@ -249,7 +274,7 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
       expect.objectContaining({
         commandId,
         action: 'tournament.entry.withdraw',
-        resources: { tournamentId, entryId },
+        resources: { entryId },
         expectedRevision: 2,
         payload: { reason: 'Unable to travel' },
       }),
@@ -257,14 +282,72 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
     );
   });
 
-  it('freezes squad via POST /tournaments/:tournamentId/entries/:entryId/freeze-squad', async () => {
+  it('adds squad member via POST /tournament-entries/:entryId/squad-members', async () => {
+    commandExecutor.execute.mockResolvedValueOnce({
+      result: { squadMemberId, squadRevision: 2 },
+      status: 'executed',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entries/${entryId}/squad-members`)
+      .set('authorization', 'Bearer valid-token')
+      .send({ commandId, userId: memberUserId, expectedRevision: 1 })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      result: { squadMemberId, squadRevision: 2 },
+      status: 'executed',
+    });
+    expect(commandExecutor.execute).toHaveBeenCalledWith(
+      principal,
+      expect.objectContaining({
+        commandId,
+        action: 'tournament.entry.squad.add_member',
+        resources: { entryId },
+        expectedRevision: 1,
+        payload: { userId: memberUserId, unclaimedId: undefined },
+      }),
+      addSquadMemberHandler,
+    );
+  });
+
+  it('removes squad member via POST /tournament-squad-members/:squadMemberId/remove', async () => {
+    commandExecutor.execute.mockResolvedValueOnce({
+      result: { squadMemberId, squadRevision: 3 },
+      status: 'executed',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/tournament-squad-members/${squadMemberId}/remove`)
+      .set('authorization', 'Bearer valid-token')
+      .send({ commandId, reason: 'Player withdrew', expectedRevision: 2 })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      result: { squadMemberId, squadRevision: 3 },
+      status: 'executed',
+    });
+    expect(commandExecutor.execute).toHaveBeenCalledWith(
+      principal,
+      expect.objectContaining({
+        commandId,
+        action: 'tournament.entry.squad.remove_member',
+        resources: { squadMemberId },
+        expectedRevision: 2,
+        payload: { reason: 'Player withdrew' },
+      }),
+      removeSquadMemberHandler,
+    );
+  });
+
+  it('freezes squad via POST /tournament-entries/:entryId/squad/freeze', async () => {
     commandExecutor.execute.mockResolvedValueOnce({
       result: { entryId, squadState: 'frozen', squadRevision: 4 },
       status: 'executed',
     });
 
     const response = await request(app.getHttpServer())
-      .post(`/api/v1/tournaments/${tournamentId}/entries/${entryId}/freeze-squad`)
+      .post(`/api/v1/tournament-entries/${entryId}/squad/freeze`)
       .set('authorization', 'Bearer valid-token')
       .send({ commandId, expectedRevision: 3 })
       .expect(201);
@@ -278,11 +361,82 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
       expect.objectContaining({
         commandId,
         action: 'tournament.entry.freeze_squad',
-        resources: { tournamentId, entryId },
+        resources: { entryId },
         expectedRevision: 3,
         payload: {},
       }),
       freezeSquadHandler,
+    );
+  });
+
+  it('records entry payment via POST /tournament-entries/:entryId/payments', async () => {
+    commandExecutor.execute.mockResolvedValueOnce({
+      result: { paymentId, entryId, amount: 5000 },
+      status: 'executed',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entries/${entryId}/payments`)
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+        amount: 5000,
+        paymentChannel: 'cash',
+        notes: 'Paid in person',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      result: { paymentId, entryId, amount: 5000 },
+      status: 'executed',
+    });
+    expect(commandExecutor.execute).toHaveBeenCalledWith(
+      principal,
+      expect.objectContaining({
+        commandId,
+        action: 'tournament.entry.payment.record',
+        resources: { entryId },
+        payload: {
+          amount: 5000,
+          paymentChannel: 'cash',
+          paymentReference: undefined,
+          notes: 'Paid in person',
+        },
+      }),
+      recordEntryPaymentHandler,
+    );
+  });
+
+  it('voids entry payment via POST /tournament-entry-payments/:paymentId/void', async () => {
+    commandExecutor.execute.mockResolvedValueOnce({
+      result: { paymentId, isVoid: true },
+      status: 'executed',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entry-payments/${paymentId}/void`)
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+        voidReason: 'Duplicate entry recorded by mistake',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      result: { paymentId, isVoid: true },
+      status: 'executed',
+    });
+    expect(commandExecutor.execute).toHaveBeenCalledWith(
+      principal,
+      expect.objectContaining({
+        commandId,
+        action: 'tournament.entry.payment.void',
+        resources: { paymentId },
+        payload: {
+          voidReason: 'Duplicate entry recorded by mistake',
+        },
+      }),
+      voidEntryPaymentHandler,
     );
   });
 

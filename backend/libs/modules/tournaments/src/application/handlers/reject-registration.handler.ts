@@ -22,24 +22,16 @@ export class RejectRegistrationHandler
     command: RejectRegistrationCommand,
   ): Promise<RejectRegistrationResult> {
     const { tx, principal } = context;
-    const tournamentId = command.resources.tournamentId!;
     const registrationId = command.resources.registrationId!;
 
-    // 1. Authorization
+    // 1. Lock registration first to derive authoritative tournament (Requirement 5)
+    const registration = await this.registrationRepo.lockRegistration(tx, registrationId);
+    const tournamentId = registration.tournamentId;
+
+    // 2. Authorize tournament review capability
     await this.tournamentAuthRepo.require(tx, tournamentId, 'tournament.registration.review');
 
-    // 2. Lock registration
-    const registration = await this.registrationRepo.lockRegistration(tx, registrationId);
-
-    // 3. Validate belongs to tournament
-    if (registration.tournamentId !== tournamentId) {
-      throw TournamentError.notFound(
-        `Registration ${registrationId} does not belong to tournament ${tournamentId}`,
-        { registrationId, tournamentId },
-      );
-    }
-
-    // 4. Must be pending
+    // 3. Must be pending
     if (registration.status !== 'pending') {
       throw TournamentError.invalidState(
         `Cannot reject registration with status '${registration.status}'`,
@@ -47,7 +39,7 @@ export class RejectRegistrationHandler
       );
     }
 
-    // 5. Resolve as rejected
+    // 4. Resolve as rejected
     await this.registrationRepo.resolveRegistration(tx, {
       registrationId,
       status: 'rejected',

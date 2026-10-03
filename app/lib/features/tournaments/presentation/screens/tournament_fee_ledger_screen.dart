@@ -52,7 +52,7 @@ class _TournamentFeeLedgerScreenState
 
     final ok = await ref.read(tournamentsControllerProvider.notifier).recordPayment(
           tournamentId: widget.tournamentId,
-          registrationId: entry.registrationId,
+          entryId: entry.entryId,
           amountPaid: outcome.amountPaid,
           channel: outcome.channel,
           reference: outcome.reference,

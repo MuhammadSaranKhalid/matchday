@@ -135,6 +135,7 @@ void main() {
             tournamentFeeLedgerProvider('tourn-console-1').overrideWith(
               (ref) => Future.value([
                 const TournamentFeeEntry(
+                  entryId: 'entry-a1',
                   registrationId: 'reg-a1',
                   teamId: 'team-2',
                   teamName: 'Karachi Kings Club',
@@ -171,6 +172,7 @@ void main() {
             tournamentFeeLedgerProvider('tourn-console-1').overrideWith(
               (ref) => Future.value([
                 const TournamentFeeEntry(
+                  entryId: 'entry-a1',
                   registrationId: 'reg-a1',
                   teamId: 'team-2',
                   teamName: 'Karachi Kings Club',

@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../matches/domain/entities/match.dart';
 import '../../domain/entities/tournament.dart';
@@ -28,9 +31,20 @@ import '../models/tournament_squad_member_dto.dart';
 import '../models/tournament_standing_dto.dart';
 
 /// Direct PostgREST + Realtime client for Tournaments tables.
+/// Participation mutations are routed through the NestJS backend
+/// (POST /api/v1/...) and read projections continue via Supabase.
 class TournamentsRemoteDataSource {
-  TournamentsRemoteDataSource(this._supabase);
+  TournamentsRemoteDataSource(
+    this._supabase, {
+    this.backendBaseUrl = 'http://127.0.0.1:3000',
+    http.Client? httpClient,
+  })  : _http = httpClient ?? http.Client();
+
   final SupabaseClient _supabase;
+  final http.Client _http;
+  final String backendBaseUrl;
+
+  static const _uuid = Uuid();
 
   static const _tournamentsTable = 'tournaments';
   static const _canonicalRegistrationsTable = 'tournament_registrations';
@@ -404,93 +418,76 @@ class TournamentsRemoteDataSource {
     String? message,
   }) async {
     _requireUid();
-    try {
-      // Server-stamped RPC inserting canonical registration and relational squad proposal
-      final regId = await _supabase.rpc<String>(
-        'tournament_register_team',
-        params: {
-          'p_tournament_id': tournamentId,
-          'p_team_id': teamId,
-          'p_player_ids': squadPlayerIds,
-          'p_message': message,
-        },
-      );
-
-      final response = await _supabase
-          .from(_canonicalRegistrationsTable)
-          .select('''
-            *,
-            teams (
-              team_name,
-              logo_url,
-              logo_monogram,
-              team_colors
-            )
-          ''')
-          .eq('registration_id', regId)
-          .single();
-
-      return TournamentRegistrationDto.fromJson(response);
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+    final response = await _backend(
+      '/api/v1/tournaments/$tournamentId/registrations',
+      body: {
+        'commandId': _uuid.v4(),
+        'teamId': teamId,
+        'squadProposal': squadPlayerIds,
+        if (message != null) 'message': message,
+      },
+    );
+    // Backend returns { result: { registrationId, ... }, status: 'executed' };
+    // re-fetch full DTO with team embed.
+    final result = response['result'] is Map<String, dynamic>
+        ? response['result'] as Map<String, dynamic>
+        : response;
+    final regId = (result['registrationId'] ?? response['registrationId']) as String?;
+    if (regId == null) {
+      throw const ServerException('RegisterTeam: missing registrationId in response');
     }
+    final row = await _supabase
+        .from(_canonicalRegistrationsTable)
+        .select('''
+          *,
+          teams (
+            team_name,
+            logo_url,
+            logo_monogram,
+            team_colors
+          )
+        ''')
+        .eq('registration_id', regId)
+        .single();
+    return TournamentRegistrationDto.fromJson(row);
   }
 
   Future<void> approveRegistration(String registrationId) async {
-    try {
-      await _supabase.rpc<void>(
-        'approve_tournament_registration',
-        params: {'p_registration_id': registrationId},
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-registrations/$registrationId/approve',
+      body: {'commandId': _uuid.v4()},
+    );
   }
 
   Future<void> rejectRegistration(
       String registrationId, String reason) async {
-    try {
-      await _supabase.rpc<void>(
-        'reject_tournament_registration',
-        params: {
-          'p_registration_id': registrationId,
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-registrations/$registrationId/reject',
+      body: {'commandId': _uuid.v4(), 'reason': reason},
+    );
   }
 
-  /// Withdraws a pending registration application before it is accepted via audited RPC.
+  /// Withdraws a pending registration application before it is accepted.
   Future<void> withdrawPendingRegistration(String registrationId,
       {String? reason}) async {
-    try {
-      await _supabase.rpc<void>(
-        'withdraw_tournament_pending_registration',
-        params: {
-          'p_registration_id': registrationId,
-          if (reason != null) 'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-registrations/$registrationId/withdraw',
+      body: {
+        'commandId': _uuid.v4(),
+        if (reason != null) 'reason': reason,
+      },
+    );
   }
 
-  /// Withdraws an accepted Entry after approval via audited RPC.
+  /// Withdraws an accepted Entry after approval.
   Future<void> withdrawEntry(String entryId, {String? reason}) async {
-    try {
-      await _supabase.rpc<void>(
-        'withdraw_tournament_entry',
-        params: {
-          'p_entry_id': entryId,
-          if (reason != null) 'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-entries/$entryId/withdraw',
+      body: {
+        'commandId': _uuid.v4(),
+        if (reason != null) 'reason': reason,
+      },
+    );
   }
 
   // ─── Canonical Entry / Squad / Payment Queries ─────────────────────────────
@@ -546,36 +543,43 @@ class TournamentsRemoteDataSource {
     String? userId,
     String? unclaimedId,
   }) async {
-    try {
-      final memberId = await _supabase.rpc<String>(
-        'tournament_squad_add_member',
-        params: {
-          'p_entry_id': entryId,
-          'p_user_id': userId,
-          'p_unclaimed_id': unclaimedId,
-        },
-      );
-      return memberId;
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
+    final response = await _backend(
+      '/api/v1/tournament-entries/$entryId/squad-members',
+      body: {
+        'commandId': _uuid.v4(),
+        if (userId != null) 'userId': userId,
+        if (unclaimedId != null) 'unclaimedId': unclaimedId,
+      },
+    );
+    final result = response['result'] is Map<String, dynamic>
+        ? response['result'] as Map<String, dynamic>
+        : response;
+    final memberId = (result['squadMemberId'] ?? response['squadMemberId']) as String?;
+    if (memberId == null) {
+      throw const ServerException('AddSquadMember: missing squadMemberId in response');
     }
+    return memberId;
   }
 
   Future<void> removeSquadMember({
     required String squadMemberId,
     String? reason,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_squad_remove_member',
-        params: {
-          'p_squad_member_id': squadMemberId,
-          'p_reason': reason,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-squad-members/$squadMemberId/remove',
+      body: {
+        'commandId': _uuid.v4(),
+        if (reason != null) 'reason': reason,
+      },
+    );
+  }
+
+  /// Freezes the squad for a tournament entry — locks the squad list.
+  Future<void> freezeSquad(String entryId) async {
+    await _backend(
+      '/api/v1/tournament-entries/$entryId/squad/freeze',
+      body: {'commandId': _uuid.v4()},
+    );
   }
 
   Future<List<TournamentEntryPaymentDto>> getEntryPayments(
@@ -1051,24 +1055,34 @@ class TournamentsRemoteDataSource {
   }
 
   Future<void> recordPayment({
-    required String registrationId,
+    required String entryId,
     required double amountPaid,
     PaymentChannel? channel,
     String? reference,
   }) async {
-    try {
-      await _supabase.rpc<void>(
-        'tournament_record_payment',
-        params: {
-          'p_registration_id': registrationId,
-          'p_amount_paid': amountPaid,
-          'p_channel': channel?.wire,
-          'p_reference': reference,
-        },
-      );
-    } on PostgrestException catch (e) {
-      throw ServerException(e.message);
-    }
+    await _backend(
+      '/api/v1/tournament-entries/$entryId/payments',
+      body: {
+        'commandId': _uuid.v4(),
+        'amount': amountPaid,
+        'paymentChannel': channel?.wire ?? 'cash',
+        if (reference != null && reference.isNotEmpty) 'paymentReference': reference,
+      },
+    );
+  }
+
+  /// Voids an existing entry payment.
+  Future<void> voidPayment({
+    required String paymentId,
+    String? voidReason,
+  }) async {
+    await _backend(
+      '/api/v1/tournament-entry-payments/$paymentId/void',
+      body: {
+        'commandId': _uuid.v4(),
+        if (voidReason != null) 'voidReason': voidReason,
+      },
+    );
   }
 
   // ─── Match officials (artboard 27j) ─────────────────────────────────────────
@@ -1244,5 +1258,43 @@ class TournamentsRemoteDataSource {
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }
+  }
+  // ─── Backend HTTP helper ─────────────────────────────────────────────────
+
+  /// Authenticated POST to the NestJS backend.
+  ///
+  /// All participation mutation commands use this instead of `_supabase.rpc`
+  /// so that business logic runs inside the NestJS TournamentCommandExecutor.
+  Future<Map<String, dynamic>> _backend(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final token = _supabase.auth.currentSession?.accessToken;
+    if (token == null) throw const UnauthorizedException('Must be signed in');
+    final uri = Uri.parse(
+      '${backendBaseUrl.replaceFirst(RegExp(r'/$'), '')}$path',
+    );
+    final response = await _http.post(
+      uri,
+      headers: {
+        'authorization': 'Bearer $token',
+        'content-type': 'application/json',
+      },
+      body: body == null ? null : jsonEncode(body),
+    );
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map<String, dynamic>
+          ? decoded['message']?.toString() ?? 'Backend request failed'
+          : 'Backend request failed';
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw UnauthorizedException(message);
+      }
+      throw ServerException(message, statusCode: response.statusCode);
+    }
+    if (decoded is Map<String, dynamic>) return decoded;
+    return const {};
   }
 }

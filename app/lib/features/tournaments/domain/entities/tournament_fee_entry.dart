@@ -36,6 +36,7 @@ enum FeeState {
 @immutable
 class TournamentFeeEntry {
   const TournamentFeeEntry({
+    required this.entryId,
     required this.registrationId,
     required this.teamId,
     required this.teamName,
@@ -49,6 +50,8 @@ class TournamentFeeEntry {
     this.recordedByName,
   });
 
+  /// The canonical tournament_entries.entry_id — used by RecordEntryPayment.
+  final String entryId;
   final String registrationId;
   final String teamId;
   final String teamName;
@@ -91,6 +94,7 @@ class TournamentFeeEntry {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is TournamentFeeEntry &&
+          other.entryId == entryId &&
           other.registrationId == registrationId &&
           other.amountPaid == amountPaid &&
           other.entryFee == entryFee &&
@@ -100,6 +104,7 @@ class TournamentFeeEntry {
 
   @override
   int get hashCode => Object.hash(
+        entryId,
         registrationId,
         amountPaid,
         entryFee,

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:matchday/core/theme/circk_theme.dart';
 import 'package:matchday/features/auth/domain/entities/user.dart';
 import 'package:matchday/features/auth/domain/value_objects/email.dart';
-import 'package:matchday/features/auth/presentation/providers/auth_providers.dart';
 import 'package:matchday/features/matches/domain/entities/match.dart';
 import 'package:matchday/features/teams/domain/entities/team.dart';
 import 'package:matchday/features/tournaments/domain/entities/tournament.dart';

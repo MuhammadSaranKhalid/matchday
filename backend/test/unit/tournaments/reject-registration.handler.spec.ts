@@ -43,7 +43,7 @@ describe('RejectRegistrationHandler', () => {
   const command: RejectRegistrationCommand = {
     commandId: context.commandId,
     action: 'tournament.registration.reject',
-    resources: { tournamentId, registrationId },
+    resources: { registrationId },
     payload: {
       reason: 'Incomplete documents',
     },
@@ -85,14 +85,14 @@ describe('RejectRegistrationHandler', () => {
       registrationId,
       status: 'rejected',
     });
+    expect(registrationRepo.lockRegistration).toHaveBeenCalledWith(
+      tx,
+      registrationId,
+    );
     expect(tournamentAuthRepo.require).toHaveBeenCalledWith(
       tx,
       tournamentId,
       'tournament.registration.review',
-    );
-    expect(registrationRepo.lockRegistration).toHaveBeenCalledWith(
-      tx,
-      registrationId,
     );
     expect(registrationRepo.resolveRegistration).toHaveBeenCalledWith(tx, {
       registrationId,
@@ -100,19 +100,6 @@ describe('RejectRegistrationHandler', () => {
       decidedBy: principal.userId,
       decisionReason: 'Incomplete documents',
     });
-  });
-
-  it('fails if registration belongs to another tournament', async () => {
-    registrationRepo.lockRegistration.mockResolvedValueOnce({
-      registrationId,
-      tournamentId: 'another-tournament',
-      teamId: '33333333-3333-4000-8000-333333333333',
-      status: 'pending',
-    });
-
-    await expect(handler.execute(context, command)).rejects.toThrow(
-      TournamentError,
-    );
   });
 
   it('fails if registration is not pending', async () => {
@@ -132,5 +119,15 @@ describe('RejectRegistrationHandler', () => {
         TOURNAMENT_ERROR_CODES.INVALID_STATE,
       );
     }
+  });
+
+  it('fails if actor lacks tournament registration review permission', async () => {
+    tournamentAuthRepo.require.mockRejectedValueOnce(
+      TournamentError.forbidden('Forbidden'),
+    );
+
+    await expect(handler.execute(context, command)).rejects.toThrow(
+      TournamentError,
+    );
   });
 });

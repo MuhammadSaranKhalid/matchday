@@ -5,6 +5,7 @@ import type {
   TournamentEntryRepository,
   TournamentRegistrationRepository,
   TournamentRootRepository,
+  TournamentSquadRepository,
 } from '../ports/tournament-repository.ports.js';
 import { TournamentError } from '../../domain/errors/tournament-error-codes.js';
 import type {
@@ -21,6 +22,7 @@ export class RegisterTeamHandler
     private readonly entryRepo: TournamentEntryRepository,
     private readonly teamRepo: TeamTournamentRepository,
     private readonly teamAuthRepo: TeamAuthorizationRepository,
+    private readonly squadRepo: TournamentSquadRepository,
   ) {}
 
   async execute(
@@ -34,18 +36,33 @@ export class RegisterTeamHandler
     // 1. Load and lock tournament root
     const tournament = await this.rootRepo.lockTournament(tx, tournamentId);
 
-    // 2. Tournament must be in open registration state
+    // 2. Tournament lifecycle check (Requirement 6)
+    if (tournament.publicationState !== 'published') {
+      throw TournamentError.invalidState(
+        `Tournament is not published (publication_state: ${tournament.publicationState})`,
+        { tournamentId, publicationState: tournament.publicationState },
+      );
+    }
+    if (tournament.terminationState !== 'none') {
+      throw TournamentError.invalidState(
+        `Tournament is terminated (termination_state: ${tournament.terminationState})`,
+        { tournamentId, terminationState: tournament.terminationState },
+      );
+    }
     if (tournament.registrationState !== 'open') {
       throw TournamentError.invalidState(
-        `Tournament registration is not open (state: ${tournament.registrationState})`,
+        `Tournament registration is not open (registration_state: ${tournament.registrationState})`,
         { tournamentId, registrationState: tournament.registrationState },
       );
     }
 
-    // 3. Deadline check
+    // 3. Deadline check using PostgreSQL CURRENT_DATE (Requirement 7)
     if (tournament.registrationDeadline) {
-      const today = new Date().toISOString().split('T')[0]!;
-      if (today > tournament.registrationDeadline) {
+      const deadlineRes = await tx.query<{ is_passed: boolean }>(
+        'SELECT ($1::date < CURRENT_DATE) AS is_passed',
+        [tournament.registrationDeadline],
+      );
+      if (deadlineRes.rows[0]?.is_passed) {
         throw TournamentError.invalidState(
           `Tournament registration deadline has passed (${tournament.registrationDeadline})`,
           { tournamentId, registrationDeadline: tournament.registrationDeadline },
@@ -74,7 +91,20 @@ export class RegisterTeamHandler
     // 5. Actor must have team register permission
     await this.teamAuthRepo.require(tx, teamId, 'team.tournament.enter');
 
-    // 6. No duplicate pending registration for this team
+    // 6. Check team does not already have an active entry
+    const existingEntry = await this.entryRepo.findActiveEntryByTeam(
+      tx,
+      tournamentId,
+      teamId,
+    );
+    if (existingEntry) {
+      throw TournamentError.conflict(
+        `Team ${teamId} already has an active entry in tournament ${tournamentId}`,
+        { teamId, tournamentId, entryId: existingEntry.entryId },
+      );
+    }
+
+    // 7. No duplicate pending registration for this team
     const hasPending = await this.registrationRepo.hasPendingRegistration(
       tx,
       tournamentId,
@@ -87,18 +117,42 @@ export class RegisterTeamHandler
       );
     }
 
-    // 7. Capacity pre-check (soft guard — ApproveRegistration enforces hard)
-    if (tournament.maxTeams !== null) {
-      const activeCount = await this.entryRepo.countActiveEntries(tx, tournamentId);
-      if (activeCount >= tournament.maxTeams) {
-        throw TournamentError.capacityReached(
-          `Tournament has reached maximum capacity of ${tournament.maxTeams} teams`,
-          { tournamentId, maxTeams: tournament.maxTeams, activeEntries: activeCount },
+    // 8. Complete proposal prevalidation in NestJS (Requirement 10)
+    if (squadProposal && squadProposal.length > 0) {
+      const seenIdentities = new Set<string>();
+      for (const member of squadProposal) {
+        const hasUser = Boolean(member.userId);
+        const hasUnclaimed = Boolean(member.unclaimedId);
+        if ((hasUser && hasUnclaimed) || (!hasUser && !hasUnclaimed)) {
+          throw TournamentError.badRequest(
+            'Proposed squad member must specify exactly one of userId or unclaimedId',
+            { member },
+          );
+        }
+        const key = hasUser ? `user:${member.userId}` : `unclaimed:${member.unclaimedId}`;
+        if (seenIdentities.has(key)) {
+          throw TournamentError.badRequest(
+            `Duplicate squad member in proposal: ${key}`,
+            { member },
+          );
+        }
+        seenIdentities.add(key);
+
+        const isActiveMember = await this.squadRepo.isPlayerInActiveTeamRoster(
+          tx,
+          teamId,
+          member,
         );
+        if (!isActiveMember) {
+          throw TournamentError.badRequest(
+            `Proposed squad member is not an active member of team ${teamId}`,
+            { member, teamId },
+          );
+        }
       }
     }
 
-    // 8. Create registration
+    // 9. Create registration
     const registrationId = await this.registrationRepo.createRegistration(tx, {
       tournamentId,
       teamId,
@@ -106,7 +160,7 @@ export class RegisterTeamHandler
       message,
     });
 
-    // 9. Create proposal members if squad proposal provided
+    // 10. Create proposal members if squad proposal provided
     if (squadProposal && squadProposal.length > 0) {
       await this.registrationRepo.createProposalMembers(tx, {
         registrationId,
@@ -120,3 +174,4 @@ export class RegisterTeamHandler
     return { registrationId, status: 'pending' };
   }
 }
+

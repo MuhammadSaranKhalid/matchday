@@ -31,7 +31,7 @@ void main() {
     void stub() {
       when(
         () => remote.recordPayment(
-          registrationId: any(named: 'registrationId'),
+          entryId: any(named: 'entryId'),
           amountPaid: any(named: 'amountPaid'),
           channel: any(named: 'channel'),
           reference: any(named: 'reference'),
@@ -41,7 +41,7 @@ void main() {
 
     test('rejects a negative amount without calling the remote', () async {
       final result = await repo.recordPayment(
-        registrationId: 'r1',
+        entryId: 'r1',
         amountPaid: -1,
       );
 
@@ -49,7 +49,7 @@ void main() {
       expect(result.getLeft().toNullable(), isA<ValidationFailure>());
       verifyNever(
         () => remote.recordPayment(
-          registrationId: any(named: 'registrationId'),
+          entryId: any(named: 'entryId'),
           amountPaid: any(named: 'amountPaid'),
         ),
       );
@@ -57,7 +57,7 @@ void main() {
 
     test('rejects a reference longer than the column', () async {
       final result = await repo.recordPayment(
-        registrationId: 'r1',
+        entryId: 'r1',
         amountPaid: 100,
         reference: 'x' * 201,
       );
@@ -68,7 +68,7 @@ void main() {
     test('trims the reference and drops an empty one', () async {
       stub();
       await repo.recordPayment(
-        registrationId: 'r1',
+        entryId: 'r1',
         amountPaid: 5000,
         channel: PaymentChannel.cash,
         reference: '   ',
@@ -76,7 +76,7 @@ void main() {
 
       verify(
         () => remote.recordPayment(
-          registrationId: 'r1',
+          entryId: 'r1',
           amountPaid: 5000,
           channel: PaymentChannel.cash,
           reference: null,
@@ -87,7 +87,7 @@ void main() {
     test('translates a server exception into a ServerFailure', () async {
       when(
         () => remote.recordPayment(
-          registrationId: any(named: 'registrationId'),
+          entryId: any(named: 'entryId'),
           amountPaid: any(named: 'amountPaid'),
           channel: any(named: 'channel'),
           reference: any(named: 'reference'),
@@ -95,7 +95,7 @@ void main() {
       ).thenThrow(const ServerException('nope'));
 
       final result = await repo.recordPayment(
-        registrationId: 'r1',
+        entryId: 'r1',
         amountPaid: 1,
       );
 

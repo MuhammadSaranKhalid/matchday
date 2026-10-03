@@ -322,6 +322,18 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
+  Future<Either<Failure, void>> freezeSquad(String entryId) async {
+    try {
+      await _remote.freezeSquad(entryId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<TournamentEntryPayment>>> getEntryPayments(
       String entryId) async {
     try {
@@ -754,7 +766,7 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
   @override
   Future<Either<Failure, Unit>> recordPayment({
-    required String registrationId,
+    required String entryId,
     required double amountPaid,
     PaymentChannel? channel,
     String? reference,
@@ -774,12 +786,32 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
 
     try {
       await _remote.recordPayment(
-        registrationId: registrationId,
+        entryId: entryId,
         amountPaid: amountPaid,
         channel: channel,
         reference: note == null || note.isEmpty ? null : note,
       );
       return const Right(unit);
+    } on UnauthorizedException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> voidPayment({
+    required String paymentId,
+    String? voidReason,
+  }) async {
+    try {
+      await _remote.voidPayment(
+        paymentId: paymentId,
+        voidReason: voidReason,
+      );
+      return const Right(null);
     } on UnauthorizedException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {

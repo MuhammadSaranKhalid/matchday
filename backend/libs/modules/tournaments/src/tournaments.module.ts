@@ -4,10 +4,14 @@ import { DatabaseExecutorService } from '../../../platform/src/database/database
 import { DatabaseModule } from '../../../platform/src/database/database.module.js';
 
 import { TournamentCommandExecutor } from './application/command-executor/tournament-command-executor.js';
+import { AddSquadMemberHandler } from './application/handlers/add-squad-member.handler.js';
 import { ApproveRegistrationHandler } from './application/handlers/approve-registration.handler.js';
 import { FreezeSquadHandler } from './application/handlers/freeze-squad.handler.js';
+import { RecordEntryPaymentHandler } from './application/handlers/record-entry-payment.handler.js';
 import { RegisterTeamHandler } from './application/handlers/register-team.handler.js';
 import { RejectRegistrationHandler } from './application/handlers/reject-registration.handler.js';
+import { RemoveSquadMemberHandler } from './application/handlers/remove-squad-member.handler.js';
+import { VoidEntryPaymentHandler } from './application/handlers/void-entry-payment.handler.js';
 import { WithdrawPendingRegistrationHandler } from './application/handlers/withdraw-pending-registration.handler.js';
 import { WithdrawTournamentEntryHandler } from './application/handlers/withdraw-tournament-entry.handler.js';
 import {
@@ -26,6 +30,7 @@ import {
   TOURNAMENT_ENTRY_REPOSITORY,
   type TournamentEntryRepository,
   TOURNAMENT_PAYMENT_REPOSITORY,
+  type TournamentPaymentRepository,
   TOURNAMENT_REGISTRATION_REPOSITORY,
   type TournamentRegistrationRepository,
   TOURNAMENT_ROOT_REPOSITORY,
@@ -86,15 +91,17 @@ import { TournamentsParticipationController } from './presentation/http/tourname
       useClass: PostgresTeamTournamentRepository,
     },
 
-    // ─── Transaction & Command Executor ──────────────────────────────────────
+    // ─── Transaction Executor ─────────────────────────────────────────────────
     {
       provide: TOURNAMENT_TRANSACTION_EXECUTOR,
       inject: [DatabaseExecutorService],
-      useFactory: (db: DatabaseExecutorService): TournamentTransactionExecutor => ({
+      useFactory: (dbExecutor: DatabaseExecutorService): TournamentTransactionExecutor => ({
         withCommandTransaction: (principal, work) =>
-          db.withCommandTransaction(principal, (client) => work(client)),
+          dbExecutor.withCommandTransaction(principal, work),
       }),
     },
+
+    // ─── Command Pipeline Executor ───────────────────────────────────────────
     {
       provide: TournamentCommandExecutor,
       inject: [TOURNAMENT_TRANSACTION_EXECUTOR, TOURNAMENT_COMMAND_RECEIPT_REPOSITORY],
@@ -113,6 +120,7 @@ import { TournamentsParticipationController } from './presentation/http/tourname
         TOURNAMENT_ENTRY_REPOSITORY,
         TEAM_TOURNAMENT_REPOSITORY,
         TEAM_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_SQUAD_REPOSITORY,
       ],
       useFactory: (
         rootRepo: TournamentRootRepository,
@@ -120,6 +128,7 @@ import { TournamentsParticipationController } from './presentation/http/tourname
         entryRepo: TournamentEntryRepository,
         teamRepo: TeamTournamentRepository,
         teamAuthRepo: TeamAuthorizationRepository,
+        squadRepo: TournamentSquadRepository,
       ) =>
         new RegisterTeamHandler(
           rootRepo,
@@ -127,6 +136,7 @@ import { TournamentsParticipationController } from './presentation/http/tourname
           entryRepo,
           teamRepo,
           teamAuthRepo,
+          squadRepo,
         ),
     },
     {
@@ -167,17 +177,14 @@ import { TournamentsParticipationController } from './presentation/http/tourname
     {
       provide: WithdrawPendingRegistrationHandler,
       inject: [
-        TOURNAMENT_AUTHORIZATION_REPOSITORY,
         TEAM_AUTHORIZATION_REPOSITORY,
         TOURNAMENT_REGISTRATION_REPOSITORY,
       ],
       useFactory: (
-        tournamentAuthRepo: TournamentAuthorizationRepository,
         teamAuthRepo: TeamAuthorizationRepository,
         regRepo: TournamentRegistrationRepository,
       ) =>
         new WithdrawPendingRegistrationHandler(
-          tournamentAuthRepo,
           teamAuthRepo,
           regRepo,
         ),
@@ -185,19 +192,55 @@ import { TournamentsParticipationController } from './presentation/http/tourname
     {
       provide: WithdrawTournamentEntryHandler,
       inject: [
-        TOURNAMENT_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_ROOT_REPOSITORY,
         TEAM_AUTHORIZATION_REPOSITORY,
         TOURNAMENT_ENTRY_REPOSITORY,
         TOURNAMENT_SQUAD_REPOSITORY,
       ],
       useFactory: (
-        tournamentAuthRepo: TournamentAuthorizationRepository,
+        rootRepo: TournamentRootRepository,
         teamAuthRepo: TeamAuthorizationRepository,
         entryRepo: TournamentEntryRepository,
         squadRepo: TournamentSquadRepository,
       ) =>
         new WithdrawTournamentEntryHandler(
-          tournamentAuthRepo,
+          rootRepo,
+          teamAuthRepo,
+          entryRepo,
+          squadRepo,
+        ),
+    },
+    {
+      provide: AddSquadMemberHandler,
+      inject: [
+        TEAM_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_ENTRY_REPOSITORY,
+        TOURNAMENT_SQUAD_REPOSITORY,
+      ],
+      useFactory: (
+        teamAuthRepo: TeamAuthorizationRepository,
+        entryRepo: TournamentEntryRepository,
+        squadRepo: TournamentSquadRepository,
+      ) =>
+        new AddSquadMemberHandler(
+          teamAuthRepo,
+          entryRepo,
+          squadRepo,
+        ),
+    },
+    {
+      provide: RemoveSquadMemberHandler,
+      inject: [
+        TEAM_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_ENTRY_REPOSITORY,
+        TOURNAMENT_SQUAD_REPOSITORY,
+      ],
+      useFactory: (
+        teamAuthRepo: TeamAuthorizationRepository,
+        entryRepo: TournamentEntryRepository,
+        squadRepo: TournamentSquadRepository,
+      ) =>
+        new RemoveSquadMemberHandler(
           teamAuthRepo,
           entryRepo,
           squadRepo,
@@ -207,18 +250,54 @@ import { TournamentsParticipationController } from './presentation/http/tourname
       provide: FreezeSquadHandler,
       inject: [
         TOURNAMENT_AUTHORIZATION_REPOSITORY,
-        TEAM_AUTHORIZATION_REPOSITORY,
         TOURNAMENT_ENTRY_REPOSITORY,
       ],
       useFactory: (
         tournamentAuthRepo: TournamentAuthorizationRepository,
-        teamAuthRepo: TeamAuthorizationRepository,
         entryRepo: TournamentEntryRepository,
       ) =>
         new FreezeSquadHandler(
           tournamentAuthRepo,
-          teamAuthRepo,
           entryRepo,
+        ),
+    },
+    {
+      provide: RecordEntryPaymentHandler,
+      inject: [
+        TOURNAMENT_ROOT_REPOSITORY,
+        TOURNAMENT_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_ENTRY_REPOSITORY,
+        TOURNAMENT_PAYMENT_REPOSITORY,
+      ],
+      useFactory: (
+        rootRepo: TournamentRootRepository,
+        tournamentAuthRepo: TournamentAuthorizationRepository,
+        entryRepo: TournamentEntryRepository,
+        paymentRepo: TournamentPaymentRepository,
+      ) =>
+        new RecordEntryPaymentHandler(
+          rootRepo,
+          tournamentAuthRepo,
+          entryRepo,
+          paymentRepo,
+        ),
+    },
+    {
+      provide: VoidEntryPaymentHandler,
+      inject: [
+        TOURNAMENT_AUTHORIZATION_REPOSITORY,
+        TOURNAMENT_ENTRY_REPOSITORY,
+        TOURNAMENT_PAYMENT_REPOSITORY,
+      ],
+      useFactory: (
+        tournamentAuthRepo: TournamentAuthorizationRepository,
+        entryRepo: TournamentEntryRepository,
+        paymentRepo: TournamentPaymentRepository,
+      ) =>
+        new VoidEntryPaymentHandler(
+          tournamentAuthRepo,
+          entryRepo,
+          paymentRepo,
         ),
     },
   ],
@@ -239,7 +318,11 @@ import { TournamentsParticipationController } from './presentation/http/tourname
     RejectRegistrationHandler,
     WithdrawPendingRegistrationHandler,
     WithdrawTournamentEntryHandler,
+    AddSquadMemberHandler,
+    RemoveSquadMemberHandler,
     FreezeSquadHandler,
+    RecordEntryPaymentHandler,
+    VoidEntryPaymentHandler,
   ],
 })
 export class TournamentsModule {}

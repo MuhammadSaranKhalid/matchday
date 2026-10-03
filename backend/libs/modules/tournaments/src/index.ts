@@ -72,8 +72,20 @@ export {
   WithdrawTournamentEntryHandler,
 } from './application/handlers/withdraw-tournament-entry.handler.js';
 export {
+  AddSquadMemberHandler,
+} from './application/handlers/add-squad-member.handler.js';
+export {
+  RemoveSquadMemberHandler,
+} from './application/handlers/remove-squad-member.handler.js';
+export {
   FreezeSquadHandler,
 } from './application/handlers/freeze-squad.handler.js';
+export {
+  RecordEntryPaymentHandler,
+} from './application/handlers/record-entry-payment.handler.js';
+export {
+  VoidEntryPaymentHandler,
+} from './application/handlers/void-entry-payment.handler.js';
 
 export {
   TOURNAMENT_TRANSACTION_EXECUTOR,

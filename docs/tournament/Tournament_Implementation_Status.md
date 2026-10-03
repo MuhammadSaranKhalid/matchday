@@ -336,7 +336,7 @@ The implementation program follows a strict 19-phase sequential progression. No 
   - Support explicit slot sources (`seed`, `winner`, `loser`, `group_rank`, `bye`).
 - **Phase 5: NestJS Tournament Command Infrastructure**
   - Scaffold NestJS Tournament command execution framework (`TournamentsModule`) with command envelope, actor validation via `request.jwt.claims`, `commandId` idempotency receipts (`private.tournament_command_receipts`), transaction-scoped advisory locks, and pure optimistic aggregate revision checks.
-- **Phase 6: Participation Commands Migration [COMPLETED]**
+- **Phase 6: Participation Commands Migration [IN PROGRESS — 6.2 CLOSURE]**
   - Implement server commands: `RegisterTeam`, `ApproveRegistration`, `RejectRegistration`, `WithdrawPendingRegistration`, `WithdrawTournamentEntry`, `FreezeSquad`, `AddSquadMember`, `RemoveSquadMember`, `RecordEntryPayment`, `VoidEntryPayment`.
   - HTTP presentation layer (`TournamentsParticipationController`), Zod validation schemas, NestJS module DI wiring, Flutter NestJS command transport cutover via `TournamentsRemoteDataSource` authenticated HTTP commands.
   - Database migrations `20261003000100_phase6_1_participation_cutover.sql` (retiring legacy RPCs) and `20261003000200_fee_ledger_add_entry_id.sql` (exposing `entry_id` for command routing).

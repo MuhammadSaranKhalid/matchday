@@ -383,6 +383,11 @@ export interface TournamentPaymentRepository {
     paymentId: string,
   ): Promise<PaymentSnapshot>;
 
+  findPayment(
+    tx: CommandQueryExecutor,
+    paymentId: string,
+  ): Promise<PaymentSnapshot | null>;
+
   getEntryNonVoidedTotal(
     tx: CommandQueryExecutor,
     entryId: string,

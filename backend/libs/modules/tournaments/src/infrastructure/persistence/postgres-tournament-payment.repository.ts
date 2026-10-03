@@ -63,6 +63,20 @@ export class PostgresTournamentPaymentRepository implements TournamentPaymentRep
     return rowToPaymentSnapshot(row);
   }
 
+  async findPayment(
+    tx: CommandQueryExecutor,
+    paymentId: string,
+  ): Promise<PaymentSnapshot | null> {
+    const result = await tx.query<PaymentRow>(
+      `SELECT ${SELECT_COLUMNS}
+       FROM public.tournament_entry_payments
+       WHERE payment_id = $1`,
+      [paymentId],
+    );
+    const row = result.rows[0];
+    return row ? rowToPaymentSnapshot(row) : null;
+  }
+
   async getEntryNonVoidedTotal(
     tx: CommandQueryExecutor,
     entryId: string,

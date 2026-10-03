@@ -12,13 +12,12 @@ import type {
 } from '../../domain/command/participation-commands.js';
 
 export class AddSquadMemberHandler
-  implements TournamentCommandHandler<AddSquadMemberCommand, AddSquadMemberResult>
-{
+  implements TournamentCommandHandler<AddSquadMemberCommand, AddSquadMemberResult> {
   constructor(
     private readonly teamAuthRepo: TeamAuthorizationRepository,
     private readonly entryRepo: TournamentEntryRepository,
     private readonly squadRepo: TournamentSquadRepository,
-  ) {}
+  ) { }
 
   async execute(
     context: TournamentCommandContext,
@@ -52,9 +51,14 @@ export class AddSquadMemberHandler
       assertExpectedRevision(command.expectedRevision, entry.squadRevision);
     }
 
-    // 5. Authorization: actor must have team.tournament.squad.manage capability (Requirement 25)
-    await this.teamAuthRepo.require(tx, teamId, 'team.tournament.squad.manage');
-
+    // 5. // Phase 6 v1 authority:
+// current Team tournament-entry authority also owns editable squad changes.
+// A distinct Team squad capability may be introduced later.
+    await this.teamAuthRepo.require(
+      tx,
+      teamId,
+      'team.tournament.enter',
+    );
     // 6. Identity validation (strict XOR)
     const { userId, unclaimedId } = command.payload;
     const hasUser = Boolean(userId);

@@ -60,9 +60,14 @@ export class RemoveSquadMemberHandler
       assertExpectedRevision(command.expectedRevision, entry.squadRevision);
     }
 
-    // 6. Authorize: team authority team.tournament.squad.manage (Requirement 26)
-    await this.teamAuthRepo.require(tx, entry.teamId, 'team.tournament.squad.manage');
-
+    // 6. // Phase 6 v1 authority:
+// current Team tournament-entry authority also owns editable squad changes.
+// A distinct Team squad capability may be introduced later.
+await this.teamAuthRepo.require(
+  tx,
+  entry.teamId,
+  'team.tournament.enter',
+);
     // 7. Soft-remove member (Requirement 22 & 26: do not DELETE)
     await this.squadRepo.removeSquadMember(tx, {
       squadMemberId,

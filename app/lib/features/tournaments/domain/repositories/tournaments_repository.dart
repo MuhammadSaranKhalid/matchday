@@ -146,10 +146,9 @@ abstract class TournamentsRepository {
 
   /// Withdraws an accepted Entry after approval.
   ///
-  /// [expectedRevision] must equal [Tournament.entryRevision] at the time of
-  /// the call. The backend rejects the command if the revision has advanced,
-  /// protecting against concurrent withdrawal races.
-  Future<Either<Failure, void>> withdrawEntry(
+  /// [expectedRevision] is Tournament.entryRevision.
+  /// Returns the authoritative resulting Tournament.entryRevision.
+  Future<Either<Failure, int>> withdrawEntry(
     String entryId, {
     required int expectedRevision,
     String? reason,
@@ -168,7 +167,13 @@ abstract class TournamentsRepository {
   /// Adds a player (claimed or unclaimed) to a tournament entry squad.
   ///
   /// [expectedRevision] must equal [TournamentEntry.squadRevision].
-  Future<Either<Failure, String>> addSquadMember({
+  Future<
+      Either<
+        Failure,
+        ({String squadMemberId, int squadRevision})
+      >
+    >
+  addSquadMember({
     required String entryId,
     required int expectedRevision,
     String? userId,
@@ -178,7 +183,7 @@ abstract class TournamentsRepository {
   /// Removes a player from a tournament entry squad.
   ///
   /// [expectedRevision] must equal [TournamentEntry.squadRevision].
-  Future<Either<Failure, void>> removeSquadMember({
+  Future<Either<Failure, int>> removeSquadMember({
     required String squadMemberId,
     required int expectedRevision,
     String? reason,
@@ -187,7 +192,7 @@ abstract class TournamentsRepository {
   /// Freezes the squad of a tournament entry so no further changes can be made.
   ///
   /// [expectedRevision] must equal [TournamentEntry.squadRevision].
-  Future<Either<Failure, void>> freezeSquad(
+  Future<Either<Failure, int>> freezeSquad(
     String entryId, {
     required int expectedRevision,
   });

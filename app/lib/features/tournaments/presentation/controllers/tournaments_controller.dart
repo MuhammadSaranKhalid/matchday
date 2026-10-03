@@ -297,11 +297,18 @@ class TournamentsController extends _$TournamentsController {
         _fail(failure);
         return false;
       },
-      (_) {
+      (entryRevision) {
         _ok();
+
+        // PostgreSQL owns entry_revision. Refetch canonical Tournament state
+        // rather than predicting the next revision locally.
         _refresh(() {
+          ref.invalidate(tournamentDetailProvider(tournamentId));
           ref.invalidate(tournamentRegistrationsProvider(tournamentId));
+          ref.invalidate(tournamentParticipantsProvider(tournamentId));
+          ref.invalidate(myPlayingTournamentsProvider);
         });
+
         return true;
       },
     );
@@ -714,12 +721,14 @@ class TournamentsController extends _$TournamentsController {
         _fail(failure);
         return null;
       },
-      (memberId) {
+      (result) {
         _ok();
+
         _refresh(() {
           ref.invalidate(tournamentParticipantsProvider(tournamentId));
         });
-        return memberId;
+
+        return result.squadMemberId;
       },
     );
   }

@@ -49,14 +49,24 @@ export class FreezeSquadHandler
     }
 
     // 5. Concurrency check against entry.squad_revision before mutation (Requirement 24)
-    if (command.expectedRevision !== undefined) {
-      assertExpectedRevision(command.expectedRevision, entry.squadRevision);
+    const expectedRevision = command.expectedRevision;
+
+    if (expectedRevision === undefined) {
+      throw TournamentError.badRequest(
+        'expectedRevision is required when freezing a Tournament squad',
+        { entryId },
+      );
     }
+
+    assertExpectedRevision(
+      expectedRevision,
+      entry.squadRevision,
+    );
 
     // 6. Freeze squad
     const newRevision = await this.entryRepo.freezeSquad(tx, {
       entryId,
-      expectedRevision: command.expectedRevision,
+      expectedRevision,
     });
 
     return {

@@ -497,12 +497,12 @@ class TournamentsRemoteDataSource {
   }
 
   /// Withdraws an accepted Entry after approval.
-  Future<void> withdrawEntry(
+  Future<int> withdrawEntry(
     String entryId, {
     required int expectedRevision,
     String? reason,
   }) async {
-    await _backend(
+    final response = await _backend(
       '/api/v1/tournament-entries/$entryId/withdraw',
       body: {
         'commandId': _uuid.v4(),
@@ -510,6 +510,22 @@ class TournamentsRemoteDataSource {
         if (reason != null) 'reason': reason,
       },
     );
+
+    final result =
+        response['result'] is Map<String, dynamic>
+            ? response['result'] as Map<String, dynamic>
+            : response;
+
+    final entryRevision =
+        (result['entryRevision'] as num?)?.toInt();
+
+    if (entryRevision == null) {
+      throw const ServerException(
+        'WithdrawTournamentEntry: missing entryRevision in response',
+      );
+    }
+
+    return entryRevision;
   }
 
   // ─── Canonical Entry / Squad / Payment Queries ─────────────────────────────
@@ -562,7 +578,7 @@ class TournamentsRemoteDataSource {
     }
   }
 
-  Future<String> addSquadMember({
+  Future<({String squadMemberId, int squadRevision})> addSquadMember({
     required String entryId,
     required int expectedRevision,
     String? userId,
@@ -577,26 +593,42 @@ class TournamentsRemoteDataSource {
         if (unclaimedId != null) 'unclaimedId': unclaimedId,
       },
     );
+
     final result =
         response['result'] is Map<String, dynamic>
             ? response['result'] as Map<String, dynamic>
             : response;
-    final memberId =
-        (result['squadMemberId'] ?? response['squadMemberId']) as String?;
-    if (memberId == null) {
+
+    final squadMemberId =
+        result['squadMemberId'] as String?;
+
+    final squadRevision =
+        (result['squadRevision'] as num?)?.toInt();
+
+    if (squadMemberId == null) {
       throw const ServerException(
         'AddSquadMember: missing squadMemberId in response',
       );
     }
-    return memberId;
+
+    if (squadRevision == null) {
+      throw const ServerException(
+        'AddSquadMember: missing squadRevision in response',
+      );
+    }
+
+    return (
+      squadMemberId: squadMemberId,
+      squadRevision: squadRevision,
+    );
   }
 
-  Future<void> removeSquadMember({
+  Future<int> removeSquadMember({
     required String squadMemberId,
     required int expectedRevision,
     String? reason,
   }) async {
-    await _backend(
+    final response = await _backend(
       '/api/v1/tournament-squad-members/$squadMemberId/remove',
       body: {
         'commandId': _uuid.v4(),
@@ -604,17 +636,52 @@ class TournamentsRemoteDataSource {
         if (reason != null) 'reason': reason,
       },
     );
+
+    final result =
+        response['result'] is Map<String, dynamic>
+            ? response['result'] as Map<String, dynamic>
+            : response;
+
+    final squadRevision =
+        (result['squadRevision'] as num?)?.toInt();
+
+    if (squadRevision == null) {
+      throw const ServerException(
+        'RemoveSquadMember: missing squadRevision in response',
+      );
+    }
+
+    return squadRevision;
   }
 
   /// Freezes the squad for a tournament entry — locks the squad list.
-  Future<void> freezeSquad(
+  Future<int> freezeSquad(
     String entryId, {
     required int expectedRevision,
   }) async {
-    await _backend(
+    final response = await _backend(
       '/api/v1/tournament-entries/$entryId/squad/freeze',
-      body: {'commandId': _uuid.v4(), 'expectedRevision': expectedRevision},
+      body: {
+        'commandId': _uuid.v4(),
+        'expectedRevision': expectedRevision,
+      },
     );
+
+    final result =
+        response['result'] is Map<String, dynamic>
+            ? response['result'] as Map<String, dynamic>
+            : response;
+
+    final squadRevision =
+        (result['squadRevision'] as num?)?.toInt();
+
+    if (squadRevision == null) {
+      throw const ServerException(
+        'FreezeSquad: missing squadRevision in response',
+      );
+    }
+
+    return squadRevision;
   }
 
   Future<List<TournamentEntryPaymentDto>> getEntryPayments(

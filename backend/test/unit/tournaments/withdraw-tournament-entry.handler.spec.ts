@@ -56,6 +56,7 @@ describe('WithdrawTournamentEntryHandler', () => {
     commandId: context.commandId,
     action: 'tournament.entry.withdraw',
     resources: { entryId },
+    expectedRevision: 2,
     payload: {
       reason: 'Team injury crisis',
     },
@@ -156,6 +157,27 @@ describe('WithdrawTournamentEntryHandler', () => {
       withdrawalReason: 'Team injury crisis',
     });
     expect(rootRepo.findTournament).toHaveBeenCalledWith(tx, tournamentId);
+  });
+
+  it('rejects an internal command that omits expectedRevision', async () => {
+    const missingRevisionCommand: WithdrawTournamentEntryCommand = {
+      ...command,
+      expectedRevision: undefined,
+    };
+
+    try {
+      await handler.execute(
+        context,
+        missingRevisionCommand,
+      );
+
+      expect.fail('Should require expectedRevision');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TournamentError);
+      expect((error as TournamentError).code).toBe(
+        TOURNAMENT_ERROR_CODES.BAD_REQUEST,
+      );
+    }
   });
 
   it('never predicts entryRevision when the authoritative Tournament cannot be re-read', async () => {

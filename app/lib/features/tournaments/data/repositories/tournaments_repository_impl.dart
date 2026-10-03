@@ -253,18 +253,18 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> withdrawEntry(
+  Future<Either<Failure, int>> withdrawEntry(
     String entryId, {
     required int expectedRevision,
     String? reason,
   }) async {
     try {
-      await _remote.withdrawEntry(
+      final entryRevision = await _remote.withdrawEntry(
         entryId,
         expectedRevision: expectedRevision,
         reason: reason,
       );
-      return const Right(null);
+      return Right(entryRevision);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -301,20 +301,26 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, String>> addSquadMember({
+  Future<
+      Either<
+        Failure,
+        ({String squadMemberId, int squadRevision})
+      >
+    >
+  addSquadMember({
     required String entryId,
     required int expectedRevision,
     String? userId,
     String? unclaimedId,
   }) async {
     try {
-      final memberId = await _remote.addSquadMember(
+      final result = await _remote.addSquadMember(
         entryId: entryId,
         expectedRevision: expectedRevision,
         userId: userId,
         unclaimedId: unclaimedId,
       );
-      return Right(memberId);
+      return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -323,18 +329,18 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> removeSquadMember({
+  Future<Either<Failure, int>> removeSquadMember({
     required String squadMemberId,
     required int expectedRevision,
     String? reason,
   }) async {
     try {
-      await _remote.removeSquadMember(
+      final squadRevision = await _remote.removeSquadMember(
         squadMemberId: squadMemberId,
         expectedRevision: expectedRevision,
         reason: reason,
       );
-      return const Right(null);
+      return Right(squadRevision);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -343,13 +349,16 @@ class TournamentsRepositoryImpl implements TournamentsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> freezeSquad(
+  Future<Either<Failure, int>> freezeSquad(
     String entryId, {
     required int expectedRevision,
   }) async {
     try {
-      await _remote.freezeSquad(entryId, expectedRevision: expectedRevision);
-      return const Right(null);
+      final squadRevision = await _remote.freezeSquad(
+        entryId,
+        expectedRevision: expectedRevision,
+      );
+      return Right(squadRevision);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

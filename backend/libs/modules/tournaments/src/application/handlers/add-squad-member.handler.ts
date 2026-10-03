@@ -47,9 +47,19 @@ export class AddSquadMemberHandler
     }
 
     // 4. Concurrency check against entry.squad_revision (Requirement 25)
-    if (command.expectedRevision !== undefined) {
-      assertExpectedRevision(command.expectedRevision, entry.squadRevision);
+    const expectedRevision = command.expectedRevision;
+
+    if (expectedRevision === undefined) {
+      throw TournamentError.badRequest(
+        'expectedRevision is required when adding a Tournament squad member',
+        { entryId },
+      );
     }
+
+    assertExpectedRevision(
+      expectedRevision,
+      entry.squadRevision,
+    );
 
     // 5. // Phase 6 v1 authority:
 // current Team tournament-entry authority also owns editable squad changes.
@@ -114,7 +124,10 @@ export class AddSquadMemberHandler
     });
 
     // 10. Bump squad revision on entry (Requirement 25: squad_revision += 1 exactly once)
-    const newRevision = await this.entryRepo.bumpSquadRevision(tx, { entryId });
+    const newRevision = await this.entryRepo.bumpSquadRevision(tx, {
+      entryId,
+      expectedRevision,
+    });
 
     return {
       squadMemberId,

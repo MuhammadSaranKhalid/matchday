@@ -449,4 +449,45 @@ describe('Tournaments Participation HTTP Endpoints (E2E)', () => {
 
     expect(commandExecutor.execute).not.toHaveBeenCalled();
   });
+
+  it('requires expectedRevision for all revision-sensitive participation commands', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entries/${entryId}/withdraw`)
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+        reason: 'Unable to continue',
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entries/${entryId}/squad-members`)
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+        userId: memberUserId,
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(
+        `/api/v1/tournament-squad-members/${squadMemberId}/remove`,
+      )
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+        reason: 'Player withdrew',
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/tournament-entries/${entryId}/squad/freeze`)
+      .set('authorization', 'Bearer valid-token')
+      .send({
+        commandId,
+      })
+      .expect(400);
+
+    expect(commandExecutor.execute).not.toHaveBeenCalled();
+  });
 });

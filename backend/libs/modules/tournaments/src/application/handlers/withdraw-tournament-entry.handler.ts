@@ -57,9 +57,22 @@ export class WithdrawTournamentEntryHandler
     await this.teamAuthRepo.require(tx, teamId, 'team.tournament.enter');
 
     // 6. Optimistic concurrency control against tournament.entry_revision (Requirement 19)
-    if (command.expectedRevision !== undefined) {
-      assertExpectedRevision(command.expectedRevision, tournament.entryRevision);
+    const expectedRevision = command.expectedRevision;
+
+    if (expectedRevision === undefined) {
+      throw TournamentError.badRequest(
+        'expectedRevision is required for Tournament Entry withdrawal',
+        {
+          entryId,
+          tournamentId,
+        },
+      );
     }
+
+    assertExpectedRevision(
+      expectedRevision,
+      tournament.entryRevision,
+    );
 
     // 7. Remove all active squad members (soft delete, preserves history) (Requirement 22)
     await this.squadRepo.removeAllActiveMembersForEntry(tx, {
